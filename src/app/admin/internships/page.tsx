@@ -29,22 +29,26 @@ export default function AdminInternshipsPage() {
 
       if (!data) { setLoading(false); return; }
 
-      const enriched: Internship[] = await Promise.all(
+      const enriched = await Promise.all(
         (data as any[]).map(async (i) => {
           const [{ count: reqCount }, { count: appCount }] = await Promise.all([
             supabase.from('internship_requirements').select('*', { count: 'exact', head: true }).eq('internship_id', i.internship_id),
             supabase.from('application').select('*', { count: 'exact', head: true }).eq('internship_id', i.internship_id),
           ]);
-          
-          // Handle potential array from Supabase join
-          const companyData = Array.isArray(i.company) ? i.company[0] : i.company;
 
-          return { 
-            ...i, 
-            company: companyData,
-            req_count: reqCount ?? 0, 
-            app_count: appCount ?? 0 
-          };
+          // Handle potential array from Supabase join
+          const companyData = Array.isArray(i.company) ? (i.company[0] ?? null) : (i.company ?? null);
+
+          return {
+            internship_id: i.internship_id as number,
+            title: i.title as string,
+            duration: (i.duration ?? null) as string | null,
+            stipend: (i.stipend ?? null) as string | null,
+            location: (i.location ?? null) as string | null,
+            company: companyData as { company_name: string } | null,
+            req_count: reqCount ?? 0,
+            app_count: appCount ?? 0,
+          } satisfies Internship;
         })
       );
 
