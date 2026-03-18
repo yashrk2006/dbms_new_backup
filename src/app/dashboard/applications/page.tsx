@@ -39,7 +39,8 @@ export default function ApplicationsPage() {
         .eq('student_id', user.id)
         .order('applied_date', { ascending: false });
 
-      setApps((data ?? []) as Application[]);
+      const fetchedApps = (data as unknown as Application[]) ?? [];
+      setApps(fetchedApps);
       setLoading(false);
     }
     load();

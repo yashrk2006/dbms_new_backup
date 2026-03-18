@@ -44,21 +44,14 @@ export default function InternshipsPage() {
       .from('application').select('internship_id').eq('student_id', user.id);
     const appliedIds = new Set((appsData ?? []).map((a: { internship_id: number }) => a.internship_id));
 
-    const mapped: Internship[] = (internshipsData ?? []).map((i: {
-      internship_id: number;
-      title: string;
-      description: string | null;
-      duration: string | null;
-      stipend: string | null;
-      location: string | null;
-      company: { company_name: string } | null;
-      required_skills: Array<{ skill_id: number; skill: { skill_name: string } | null }>;
-    }) => {
-      const reqSkills = (i.required_skills ?? []).map((rs) => ({
+    const mapped: Internship[] = ((internshipsData ?? []) as any[]).map((i) => {
+      // Supabase may return company as an array from joins
+      const companyRaw = Array.isArray(i.company) ? i.company[0] : i.company;
+      const reqSkills = ((i.required_skills ?? []) as any[]).map((rs: any) => ({
         skill_id: rs.skill_id,
-        skill_name: rs.skill?.skill_name ?? '',
+        skill_name: (Array.isArray(rs.skill) ? rs.skill[0]?.skill_name : rs.skill?.skill_name) ?? '',
       }));
-      const matched = reqSkills.filter((rs) => mySkillIds.has(rs.skill_id)).length;
+      const matched = reqSkills.filter((rs: { skill_id: number }) => mySkillIds.has(rs.skill_id)).length;
       const match_percentage = reqSkills.length > 0 ? Math.round((matched / reqSkills.length) * 100) : 0;
       return {
         internship_id: i.internship_id,
@@ -67,12 +60,12 @@ export default function InternshipsPage() {
         duration: i.duration,
         stipend: i.stipend,
         location: i.location,
-        company: i.company,
+        company: companyRaw ?? null,
         required_skills: reqSkills,
         match_percentage,
         applied: appliedIds.has(i.internship_id),
       };
-    }).sort((a, b) => b.match_percentage - a.match_percentage);
+    }).sort((a: Internship, b: Internship) => b.match_percentage - a.match_percentage);
 
     setInternships(mapped);
     setLoading(false);

@@ -47,7 +47,7 @@ export default function DashboardPage() {
         .order('applied_date', { ascending: false })
         .limit(5);
 
-      if (apps) setRecentApplications(apps as typeof recentApplications);
+      if (apps) setRecentApplications(apps as unknown as typeof recentApplications);
       setLoading(false);
     }
     load();
