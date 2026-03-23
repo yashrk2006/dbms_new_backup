@@ -241,7 +241,7 @@ export default function InternshipsPage() {
                           id={`apply-btn-${i.internship_id}`}
                           onClick={() => handleApply(i.internship_id)}
                           disabled={i.applied || applying === i.internship_id}
-                          variant={i.applied ? 'outline' : 'default'}
+                          variant={i.applied ? 'outline' : 'primary'}
                           className={cn(
                             "h-11 px-8 rounded-xl font-bold transition-all shadow-lg",
                             !i.applied && "shadow-indigo-100 hover:shadow-indigo-200"
