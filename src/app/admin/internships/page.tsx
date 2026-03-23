@@ -22,33 +22,48 @@ export default function AdminInternshipsPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('internship')
-        .select('internship_id, title, duration, stipend, location, company:company_id(company_name)')
+        .select(`
+          internship_id,
+          title,
+          duration,
+          stipend,
+          location,
+          company:company_id (
+            company_name
+          )
+        `)
         .order('internship_id');
 
-      if (!data) { setLoading(false); return; }
+      if (error || !data) {
+        setLoading(false);
+        return;
+      }
 
-      const enriched = await Promise.all(
-        (data as any[]).map(async (i) => {
-          const [{ count: reqCount }, { count: appCount }] = await Promise.all([
+      const enriched: Internship[] = await Promise.all(
+        data.map(async (i: any) => {
+          const [reqRes, appRes] = await Promise.all([
             supabase.from('internship_requirements').select('*', { count: 'exact', head: true }).eq('internship_id', i.internship_id),
             supabase.from('application').select('*', { count: 'exact', head: true }).eq('internship_id', i.internship_id),
           ]);
 
-          // Handle potential array from Supabase join
-          const companyData = Array.isArray(i.company) ? (i.company[0] ?? null) : (i.company ?? null);
+          // Supabase joins can return an array even for 1:1 relations
+          const rawCompany = i.company;
+          const companyData = Array.isArray(rawCompany) 
+            ? rawCompany[0] 
+            : rawCompany;
 
           return {
-            internship_id: i.internship_id as number,
-            title: i.title as string,
-            duration: (i.duration ?? null) as string | null,
-            stipend: (i.stipend ?? null) as string | null,
-            location: (i.location ?? null) as string | null,
-            company: companyData as { company_name: string } | null,
-            req_count: reqCount ?? 0,
-            app_count: appCount ?? 0,
-          } satisfies Internship;
+            internship_id: i.internship_id,
+            title: i.title || 'Untitled',
+            duration: i.duration,
+            stipend: i.stipend,
+            location: i.location,
+            company: companyData ? { company_name: companyData.company_name } : null,
+            req_count: reqRes.count ?? 0,
+            app_count: appRes.count ?? 0,
+          };
         })
       );
 
