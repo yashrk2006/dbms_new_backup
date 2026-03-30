@@ -41,10 +41,11 @@ export default function InternshipsPage() {
   const [search, setSearch] = useState('');
   const [mySkills, setMySkills] = useState<string[]>([]);
   const [now, setNow] = useState<number>(0);
-  const [aiInterviewModal, setAiInterviewModal] = useState<{ open: boolean; title: string; questions: string[] }>({
+  const [aiInterviewModal, setAiInterviewModal] = useState<{ open: boolean; title: string; questions: string[]; isLoading: boolean }>({
     open: false,
     title: '',
-    questions: []
+    questions: [],
+    isLoading: false
   });
 
   const load = useCallback(async () => {
@@ -62,7 +63,7 @@ export default function InternshipsPage() {
       const currentSkills = statsResult.success ? statsResult.student.skills.map((s: any) => s.skill_name) : [];
       setMySkills(currentSkills);
 
-      const respInternships = await fetch(`/api/internships?userId=${storedUserId}`);
+      const respInternships = await fetch(`/api/internships?userId=${storedUserId}&t=${Date.now()}`, { cache: 'no-store' });
       const internshipsResult = await respInternships.json();
       
       if (internshipsResult.success) {
@@ -104,14 +105,28 @@ export default function InternshipsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleInterviewPrep = (internship: Internship) => {
-    const questions = AI_ENGINE.generateInterviewQuestions(mySkills, internship.title);
-    setAiInterviewModal({
-      open: true,
-      title: internship.title,
-      questions
-    });
-    toast.success('AI Interview Simulator active.', { icon: '🤖' });
+  const handleInterviewPrep = async (internship: Internship) => {
+    setAiInterviewModal({ open: true, title: internship.title, questions: [], isLoading: true });
+    
+    try {
+      const res = await fetch('/api/ai/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skills: mySkills, title: internship.title })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setAiInterviewModal(prev => ({ ...prev, questions: data.questions, isLoading: false }));
+        toast.success('AI Interview Generated.', { icon: '🤖' });
+      } else {
+        toast.error('AI Simulator Error: ' + data.error);
+        setAiInterviewModal(prev => ({ ...prev, open: false, isLoading: false }));
+      }
+    } catch (e) {
+      toast.error('Network error during AI Generation');
+      setAiInterviewModal(prev => ({ ...prev, open: false, isLoading: false }));
+    }
   };
 
   // Skill Evolution Predictor Logic
@@ -447,7 +462,17 @@ export default function InternshipsPage() {
                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-[3px] mb-12">Targeting: {aiInterviewModal.title}</p>
                  
                  <div className="space-y-6 mb-12">
-                   {aiInterviewModal.questions.map((q, idx) => (
+                   {aiInterviewModal.isLoading ? (
+                     <div className="flex flex-col items-center justify-center p-12 gap-6 bg-slate-50 border border-slate-100 rounded-2xl">
+                       <motion.div animate={{ rotate: 360, scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="text-indigo-500">
+                         <Sparkles size={40} className="fill-indigo-500/20" />
+                       </motion.div>
+                       <div className="text-center">
+                         <h3 className="text-xs font-black uppercase tracking-[5px] text-indigo-600 mb-2">Connecting Context to Cohere</h3>
+                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] animate-pulse">Generating personalized technical behavioral challenges...</p>
+                       </div>
+                     </div>
+                   ) : aiInterviewModal.questions.map((q, idx) => (
                      <div key={idx} className="p-6 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all">
                         <div className="flex items-start gap-4">
                            <span className="text-[10px] font-black text-indigo-600/30 mt-1">0{idx+1}</span>

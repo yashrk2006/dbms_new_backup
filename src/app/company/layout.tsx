@@ -63,7 +63,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      <aside className="w-64 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col shadow-sm">
+      <aside className="w-64 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col shadow-sm sticky top-0 h-screen overflow-y-auto">
         <div className="p-6 border-b border-slate-50 flex items-center gap-3">
           <div className="size-9 rounded-xl bg-amber-600 flex items-center justify-center shadow-lg shadow-amber-600/10 shrink-0">
             <Building2 size={18} className="text-white" />
@@ -73,7 +73,7 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
           </span>
         </div>
 
-        <nav className="flex-1 p-4 flex flex-col gap-1">
+        <nav className="p-4 flex flex-col gap-1 pb-8 border-b border-slate-50">
           {navItems.map(item => (
             <Link
               key={item.href}

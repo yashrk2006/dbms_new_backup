@@ -61,8 +61,8 @@ export default function CompanyGateway() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.1 }}
-                key={company.id}
-                onClick={() => handleLogin(company.id)}
+                key={company.company_id}
+                onClick={() => handleLogin(company.company_id)}
                 className="group relative bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-left overflow-hidden"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-amber-600 to-amber-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

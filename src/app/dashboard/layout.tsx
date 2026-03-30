@@ -98,7 +98,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
         </div>
 
-        <nav className="flex-1 px-6 py-4 flex flex-col gap-3" suppressHydrationWarning>
+        <nav className="px-6 py-4 flex flex-col gap-3 pb-8" suppressHydrationWarning>
           <div className="px-4 mb-6 flex items-center gap-3" suppressHydrationWarning>
              <div className="h-px flex-1 bg-slate-100" />
              <span className="text-[9px] font-black uppercase tracking-[5px] text-slate-400">Navigation</span>
