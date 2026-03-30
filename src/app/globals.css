@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 @theme {
   /* HSL Variable Mappings */
   --color-background: hsl(var(--background));
@@ -29,6 +31,7 @@
   --color-ring: hsl(var(--ring));
 
   /* Specific Brand Colors - Refined Professional */
+  --color-amber-700: #b45309;
   --color-amber-600: #d97706;
   --color-amber-500: #f59e0b;
   --color-slate-900: #0f172a;
