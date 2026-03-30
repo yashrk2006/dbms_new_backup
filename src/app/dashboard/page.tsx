@@ -12,6 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { ThreeDCard } from '@/components/ui/ThreeDCard';
 import { AI_ENGINE } from '@/lib/ai-engine';
+import { NeuralCore3D } from '@/components/ui/NeuralCore3D';
 
 const statusConfig: Record<string, { color: string; bg: string; border: string; icon: any }> = {
   'Pending':      { color: 'text-slate-500',  bg: 'bg-slate-50',   border: 'border-slate-100',  icon: Clock         },
@@ -161,11 +162,11 @@ export default function DashboardPage() {
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-[70vh] gap-8">
       <motion.div
-        animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.05, 1] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-        className="size-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-lg"
+        animate={{ rotateY: 360 }}
+        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+        className="size-24"
       >
-        <Zap size={32} className="fill-amber-600" />
+        <NeuralCore3D status="processing" size={96} />
       </motion.div>
       <div className="text-center space-y-2">
         <h2 className="text-[10px] font-black uppercase tracking-[10px] text-amber-600">Loading Dashboard</h2>
@@ -225,18 +226,30 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Technical Readiness Radar */}
-            <ThreeDCard>
-              <div className="shrink-0 p-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-6 relative group overflow-hidden">
-                  <div className="absolute top-4 left-4">
-                     <div className="flex items-center gap-2">
-                        <Cpu size={12} className="text-amber-500" />
-                        <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-400">Readiness Radar</span>
-                     </div>
+            {/* Technical Readiness Radar & Skill Orb Container */}
+            <div className="flex flex-col gap-6">
+                <ThreeDCard>
+                  <div className="shrink-0 p-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-6 relative group overflow-hidden">
+                      <div className="absolute top-4 left-4">
+                         <div className="flex items-center gap-2">
+                            <Cpu size={12} className="text-amber-500" />
+                            <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-400">Readiness Radar</span>
+                         </div>
+                      </div>
+                      {readinessData.length > 0 && <RadarChart data={readinessData} />}
                   </div>
-                  {readinessData.length > 0 && <RadarChart data={readinessData} />}
-              </div>
-            </ThreeDCard>
+                </ThreeDCard>
+
+                <div className="p-6 rounded-3xl bg-white border border-slate-100 flex items-center gap-4 relative overflow-hidden group">
+                   <div className="absolute -right-4 -top-4 opacity-40 group-hover:scale-110 transition-transform">
+                      <NeuralCore3D status="active" size={120} />
+                   </div>
+                   <div className="relative z-10">
+                      <div className="text-[8px] font-black text-amber-500 uppercase tracking-widest mb-1">Career Energy</div>
+                      <div className="text-xl font-black text-slate-900 tracking-tighter uppercase italic italic">Active Vector</div>
+                   </div>
+                </div>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 min-w-[200px]">

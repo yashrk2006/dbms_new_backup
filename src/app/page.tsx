@@ -102,8 +102,8 @@ export default function LandingPage() {
     <div className="flex flex-col min-h-screen selection:bg-amber-500/30 text-slate-900 bg-white selection:text-white">
       <Navbar />
       
-      {/* 3D NEURAL OVERLAY (HUD) */}
-      <NeuralArchitectureHUD progress={scrollYProgress} range={[0.25, 0.5]} />
+      {/* 3D NEURAL OVERLAY (HUD) - Refined Range & Z-Index Focus */}
+      <NeuralArchitectureHUD progress={scrollYProgress} range={[0.15, 0.4]} />
 
       <main className="flex-grow pt-32">
         {/* --- 3D HERO SECTION --- */}
@@ -446,7 +446,7 @@ export default function LandingPage() {
                  </h3>
               </AnimatedSection>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 perspective-[1500px]">
+              <div className="flex flex-col md:flex-row gap-12 perspective-[2000px] py-10 relative">
                  {[
                    { name: "Marcus Chen", role: "Senior Architect @ Vercel", quote: "SkillSync has fundamentally redefined how we audit frontend talent. The 2025 roadmap is spot on.", rating: 5 },
                    { name: "Sarah Jenkins", role: "Lead Engineer @ Stripe", quote: "The most high-fidelity recruitment experience I've ever encountered. The AI matching is eerily accurate.", rating: 5 },
@@ -454,14 +454,14 @@ export default function LandingPage() {
                  ].map((t, i) => (
                    <motion.div 
                      key={i}
-                     initial={{ opacity: 0, rotateY: -30, translateZ: -200 }}
-                     whileInView={{ opacity: 1, rotateY: 0, translateZ: 0 }}
-                     viewport={{ once: true }}
-                     transition={{ delay: i * 0.2, duration: 0.8 }}
-                     className="group"
+                     initial={{ opacity: 0, rotateY: i % 2 === 0 ? -25 : 25, z: -200 }}
+                     whileInView={{ opacity: 1, rotateY: 0, z: 0 }}
+                     viewport={{ once: false, margin: "-100px" }}
+                     transition={{ duration: 0.8, ease: "easeOut" }}
+                     className="flex-1 min-w-[320px] group"
                    >
                      <ThreeDCard className="h-full">
-                        <div className="h-full p-10 rounded-[3rem] bg-white/5 border border-white/10 backdrop-blur-xl flex flex-col justify-between hover:border-amber-500/50 transition-colors">
+                        <div className="h-full p-10 rounded-[3rem] bg-white/5 border border-white/10 backdrop-blur-xl flex flex-col justify-between hover:border-amber-500/50 transition-all duration-500 group-hover:bg-white/[0.08]">
                            <div className="space-y-6">
                               <div className="flex gap-1 text-amber-500">
                                  {[...Array(t.rating)].map((_, i) => <Sparkles key={i} size={12} fill="currentColor" />)}

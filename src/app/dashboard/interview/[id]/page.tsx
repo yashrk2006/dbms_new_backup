@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { AI_ENGINE } from '@/lib/ai-engine';
 import { toast } from 'react-hot-toast';
+import { NeuralCore3D } from '@/components/ui/NeuralCore3D';
 
 export default function AIInterviewSimulator() {
   const router = useRouter();
@@ -113,8 +114,19 @@ export default function AIInterviewSimulator() {
         </button>
       </header>
 
-      <main className="max-w-4xl mx-auto p-8 pt-16">
-        <AnimatePresence mode="wait">
+      <main className="max-w-6xl mx-auto p-4 md:p-8 pt-16 relative">
+        {/* --- 3D INTERFACE WRAPPER --- */}
+        <motion.div
+           initial={{ perspective: 1500, rotateX: 5 }}
+           animate={{ rotateX: 0 }}
+           className="relative z-10"
+        >
+          {/* AI PERSONA (3D CORE) */}
+          <div className="absolute top-[-100px] left-1/2 -translate-x-1/2 opacity-60">
+             <NeuralCore3D status={isFinished ? 'active' : (isStarted ? 'processing' : 'idle')} size={240} />
+          </div>
+
+          <AnimatePresence mode="wait">
           {!isStarted && !isFinished && (
             <motion.div 
               key="start"
@@ -263,7 +275,22 @@ export default function AIInterviewSimulator() {
               </button>
             </motion.div>
           )}
-        </AnimatePresence>
+          </AnimatePresence>
+        </motion.div>
+
+        {/* --- BACKGROUND HUD OVERLAY --- */}
+        <div className="fixed inset-0 pointer-events-none opacity-20 pointer-events-none overflow-hidden">
+           <div className="absolute top-1/4 left-10 text-[9px] font-mono font-black text-amber-500/40 uppercase tracking-[4px] space-y-2 border-l border-amber-500/20 pl-4">
+              <div>VOWEL_FOCUS: 82%</div>
+              <div>SEMANTIC_LOCK: ACTIVE</div>
+              <div>THOUGHT_LATENCY: 4.2MS</div>
+           </div>
+           <div className="absolute bottom-1/4 right-10 text-[9px] font-mono font-black text-indigo-500/40 uppercase tracking-[4px] text-right space-y-2 border-r border-indigo-500/20 pr-4">
+              <div>CORE: HIFI_SYNC</div>
+              <div>VECTOR: OPTIMIZING</div>
+           </div>
+           <div className="absolute inset-x-0 bottom-0 h-[30vh] bg-gradient-to-t from-amber-500/[0.04] to-transparent" />
+        </div>
       </main>
     </div>
   );

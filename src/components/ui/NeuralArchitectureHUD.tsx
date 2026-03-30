@@ -8,18 +8,23 @@ interface HUDProps {
   range?: [number, number];
 }
 
-export function NeuralArchitectureHUD({ progress, range = [0.3, 0.6] }: HUDProps) {
+export function NeuralArchitectureHUD({ progress, range = [0.2, 0.4] }: HUDProps) {
   // Descent from top with perspective tilt
-  const y = useTransform(progress, range, [-300, 0]);
-  const opacity = useTransform(progress, [range[0], range[0] + 0.1], [0, 1]);
-  const rotateX = useTransform(progress, range, [-45, 12]);
-  const scale = useTransform(progress, range, [0.8, 1]);
-  const z = useTransform(progress, range, [-200, 100]);
+  const midRange = (range[0] + range[1]) / 2;
+  const y = useTransform(progress, range, [-200, 100]);
+  const opacity = useTransform(
+    progress, 
+    [range[0], range[0] + 0.05, range[1] - 0.05, range[1]], 
+    [0, 0.6, 0.6, 0] // Peaks in the middle, fades at edges
+  );
+  const rotateX = useTransform(progress, range, [-30, 10]);
+  const scale = useTransform(progress, range, [0.6, 0.8]);
+  const z = useTransform(progress, range, [-100, 50]);
 
   return (
     <motion.div
-      style={{ y, opacity, rotateX, scale, z, perspective: 1000 }}
-      className="pointer-events-none fixed inset-x-0 top-1/2 -translate-y-1/2 z-50 flex items-center justify-center p-20"
+      style={{ y, opacity, rotateX, scale, z, perspective: 1200 }}
+      className="pointer-events-none fixed inset-x-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center p-20"
     >
       <div className="relative size-[600px] flex items-center justify-center">
         {/* --- HOLOGRAPHIC RINGS (SVG) --- */}
