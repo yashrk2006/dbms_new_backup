@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from "react";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 
 interface PremiumCardProps {
   children: ReactNode;
@@ -34,14 +34,14 @@ export default function PremiumCard({
   };
   const hoverClasses = hoverable ? "card-hover cursor-pointer" : "";
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { y: 20, opacity: 0 },
     visible: {
       y: 0,
       opacity: 1,
       transition: {
         duration,
-        ease: [0.22, 1, 0.36, 1],
+        ease: [0.22, 1, 0.36, 1] as any,
       },
     },
   };
@@ -56,9 +56,9 @@ export default function PremiumCard({
       transition={{ 
         duration, 
         delay, 
-        ease: [0.22, 1, 0.36, 1] 
+        ease: [0.22, 1, 0.36, 1] as any
       }}
-      className={`group relative ${baseClasses} ${variantClasses[variant]} ${hoverClasses}`}
+      className={`group relative ${baseClasses} ${variantClasses[variant] || variantClasses.glass} ${hoverClasses}`}
     >
       {/* Premium Corner Highlight */}
       <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">

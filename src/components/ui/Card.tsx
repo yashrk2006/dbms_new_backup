@@ -8,7 +8,7 @@ const Card = React.forwardRef<HTMLDivElement, HTMLMotionProps<"div">>(
       ref={ref}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] as any }}
       className={cn(
         "glass-panel rounded-2xl overflow-hidden group transition-all duration-500",
         className
