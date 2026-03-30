@@ -25,6 +25,7 @@ import Footer from "@/components/layout/Footer";
 import AnimatedSection from "@/components/ui/AnimatedSection";
 import PremiumCard from "@/components/ui/PremiumCard";
 import { ThreeDCard } from "@/components/ui/ThreeDCard";
+import { NeuralArchitectureHUD } from "@/components/ui/NeuralArchitectureHUD";
 
 export default function LandingPage() {
   const scrollRef = useRef(null);
@@ -100,6 +101,9 @@ export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen selection:bg-amber-500/30 text-slate-900 bg-white selection:text-white">
       <Navbar />
+      
+      {/* 3D NEURAL OVERLAY (HUD) */}
+      <NeuralArchitectureHUD progress={scrollYProgress} range={[0.25, 0.5]} />
 
       <main className="flex-grow pt-32">
         {/* --- 3D HERO SECTION --- */}

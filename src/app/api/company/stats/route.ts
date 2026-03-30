@@ -24,9 +24,9 @@ export async function GET(request: Request) {
     }
 
     // 2. Fetch Company Internships with Requirements
-    const { data: internshipsRaw, error: internError } = await supabase
+    const { data: internshipsRaw, error: internError } = await (supabase
       .from('internship')
-      .select('*, internship_requirements(skill(skill_name))')
+      .select('*, internship_requirements(skill(skill_name))') as any)
       .eq('company_id', companyId);
 
     const internships: IInternship[] = (internshipsRaw || []).map((i: any) => ({
@@ -38,25 +38,15 @@ export async function GET(request: Request) {
     } as any));
 
     // 3. Fetch Applications for the company with student info
-    const { data: applicationsRaw } = await supabase
-      .from('application')
-      .select(`
-        *,
-        student(student_id, name, student_skill(skill(skill_name))),
-        internship(internship_id, title)
-      `)
-      .eq('internship.company_id' as any, companyId);
-    
-    // Note: Supabase filtering on joined tables can be tricky. 
-    // Alternative: Fetch internships first, then applications filtering by internship_id is safer if the above fails.
+    // Filtering by internship_id is the reactive approach for high-fidelity data integrity.
     const internshipIds = internships.map(i => parseInt(i.id));
-    const { data: filteredAppsRaw } = await supabase
+    const { data: filteredAppsRaw } = await (supabase
       .from('application')
       .select(`
         *,
         student(student_id, name, student_skill(skill(skill_name))),
         internship(internship_id, title)
-      `)
+      `) as any)
       .in('internship_id', internshipIds);
 
     const enrichedApplications = (filteredAppsRaw || []).map((app: any) => {
@@ -80,23 +70,23 @@ export async function GET(request: Request) {
 
     // 4. Talent Discovery: Find top students not yet applied
     // Fetch all students and their skills
-    const { data: allStudentsRaw } = await supabase
+    const { data: allStudentsRaw } = await (supabase
       .from('student')
-      .select('student_id, name, student_skill(skill(skill_name))');
+      .select('student_id, name, student_skill(skill(skill_name))') as any);
 
-    const appliedStudentIds = new Set(enrichedApplications.map(a => a.student_id));
+    const appliedStudentIds = new Set(enrichedApplications.map((a: any) => a.student_id));
     
     const talentPool = (allStudentsRaw || [])
-      .filter(s => !appliedStudentIds.has(s.student_id))
-      .map(s => {
+      .filter((s: any) => !appliedStudentIds.has(s.student_id))
+      .map((s: any) => {
         const studentSkills = s.student_skill?.map((sk: any) => sk.skill.skill_name) || [];
         
         // Find the best matching internship for this student
-        const matches = internships.map(intern => ({
+        const matches = internships.map((intern: any) => ({
           roleId: intern.id,
           title: intern.title,
           score: AI_ENGINE.calculateMatchScore(studentSkills, intern.requirements.role_skills)
-        })).sort((a, b) => b.score - a.score);
+        })).sort((a: any, b: any) => b.score - a.score);
 
         const bestMatch = matches[0] || null;
 
@@ -111,8 +101,8 @@ export async function GET(request: Request) {
           } : null
         };
       })
-      .filter(s => s.top_match && s.top_match.score > 60)
-      .sort((a, b) => (b.top_match?.score || 0) - (a.top_match?.score || 0))
+      .filter((s: any) => s.top_match && s.top_match.score > 60)
+      .sort((a: any, b: any) => (b.top_match?.score || 0) - (a.top_match?.score || 0))
       .slice(0, 5);
 
     return NextResponse.json({
@@ -120,8 +110,8 @@ export async function GET(request: Request) {
       stats: {
         activeRoles: internships.length,
         totalApplicants: enrichedApplications.length,
-        pendingReview: enrichedApplications.filter(a => a.status === 'Pending').length,
-        interviewsScheduled: enrichedApplications.filter(a => a.status === 'Interviewing').length
+        pendingReview: enrichedApplications.filter((a: any) => a.status === 'Pending').length,
+        interviewsScheduled: enrichedApplications.filter((a: any) => a.status === 'Interviewing').length
       },
       applications: enrichedApplications,
       talentDiscovery: talentPool
