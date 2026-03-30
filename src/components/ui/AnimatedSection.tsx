@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { ReactNode } from "react";
 
 interface AnimatedSectionProps {
@@ -22,16 +22,17 @@ export default function AnimatedSection({
   duration = 0.5,
   staggerChildren = false,
 }: AnimatedSectionProps) {
-  const getInitial = () => {
+  const getInitial = (): { x?: number; y?: number; opacity: number } => {
     switch (direction) {
       case "up": return { y: distance, opacity: 0 };
       case "down": return { y: -distance, opacity: 0 };
       case "left": return { x: distance, opacity: 0 };
       case "right": return { x: -distance, opacity: 0 };
+      default: return { y: distance, opacity: 0 };
     }
   };
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -42,7 +43,7 @@ export default function AnimatedSection({
     },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: getInitial(),
     visible: {
       x: 0,
@@ -50,7 +51,7 @@ export default function AnimatedSection({
       opacity: 1,
       transition: {
         duration,
-        ease: [0.16, 1, 0.3, 1],
+        ease: [0.16, 1, 0.3, 1] as any,
       },
     },
   };
