@@ -288,7 +288,8 @@ export default function InternshipsPage() {
                     i.match_percentage >= 80 ? "bg-amber-600/[0.03]" : i.match_percentage >= 50 ? "bg-amber-500/[0.03]" : "bg-slate-50"
                   }`}>
                     <div className="relative group/score">
-                       <svg className="size-32 transform -rotate-90">
+                       <div className="absolute -inset-4 bg-amber-600/5 blur-2xl rounded-full opacity-0 group-hover/score:opacity-100 transition-opacity duration-700" />
+                       <svg className="size-32 transform -rotate-90 relative z-10">
                          <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-slate-100" />
                          <motion.circle
                            cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="6" fill="transparent"
@@ -299,9 +300,11 @@ export default function InternshipsPage() {
                            className={i.match_percentage >= 80 ? "text-amber-600" : i.match_percentage >= 50 ? "text-amber-500" : "text-slate-300"}
                          />
                        </svg>
-                       <div className="absolute inset-0 flex flex-col items-center justify-center group-hover/score:scale-110 transition-transform duration-500">
+                       <div className="absolute inset-0 flex flex-col items-center justify-center group-hover/score:scale-110 transition-transform duration-500 z-20">
                          <span className="text-4xl font-black text-slate-900 tracking-tighter">{i.match_percentage}<span className="text-lg opacity-30">%</span></span>
                          <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-400">Match</span>
+                         {/* Tactical HUD Overlay */}
+                         <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.05)_50%),linear-gradient(90deg,rgba(255,0,0,0.01),rgba(0,255,0,0.01),rgba(0,0,255,0.01))] bg-[length:100%_2px,3px_100%] pointer-events-none rounded-full overflow-hidden opacity-20" />
                        </div>
                     </div>
                     <div className="space-y-4">

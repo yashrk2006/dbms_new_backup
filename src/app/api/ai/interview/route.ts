@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    const { skills, title } = await req.json();
+    const { skills, title, scope = 'STUDENT_PREP' } = await req.json();
 
     if (!skills || !title) {
        return NextResponse.json({ success: false, error: 'Missing parameters. Requires skills and title.' }, { status: 400 });
@@ -13,9 +13,17 @@ export async function POST(req: Request) {
        return NextResponse.json({ success: false, error: 'AI Simulator is currently offline. Missing API Key.' }, { status: 500 });
     }
 
-    const prompt = `You are an expert technical interviewer for a "${title}" position. The candidate has the following core skills: ${skills.join(', ')}. Generate exactly 3 highly specific, challenging technical behavioral or system-design interview questions tailored towards testing their understanding of those specific skills in the context of the requested job role.
+    let prompt = '';
+    if (scope === 'COMPANY_ASSESSMENT') {
+      prompt = `You are a Lead Technical Architect and Recruiter evaluating a candidate for a "${title}" role. The candidate claims proficiency in: ${skills.join(', ')}. 
+      Generate exactly 3 extremely high-level, tactical screening questions designed to expose the depth of their actual production experience with these specific technologies. 
+      Focus on edge cases, architectural trade-offs, and scaling challenges.`;
+    } else {
+      prompt = `You are an expert technical interviewer for a "${title}" position. The candidate has the following core skills: ${skills.join(', ')}. 
+      Generate exactly 3 highly specific, challenging technical behavioral or system-design interview questions tailored towards testing their understanding of those specific skills in the context of the requested job role.`;
+    }
     
-CRITICAL RULE: Return ONLY a raw JSON array of exactly 3 strings. Do NOT wrap it in a markdown code block (no \`\`\`json). Do NOT add any preamble. 
+    prompt += `\n\nCRITICAL RULE: Return ONLY a raw JSON array of exactly 3 strings. Do NOT wrap it in a markdown code block (no \`\`\`json). Do NOT add any preamble. 
 Example exactly like this:
 ["Question 1?", "Question 2?", "Question 3?"]`;
 
@@ -28,7 +36,7 @@ Example exactly like this:
        },
        body: JSON.stringify({
          message: prompt,
-         model: 'command-r', // Faster than command-r-plus, perfect for generating 3 questions
+         model: 'command-r', 
          temperature: 0.6,
        })
     });
@@ -60,19 +68,18 @@ Example exactly like this:
         return NextResponse.json({ success: true, questions: parsedQuestions });
     } catch (parseError) {
         console.error("Failed to parse AI output:", rawText);
-        // Fallback gracefully if AI goes completely off the rails
         return NextResponse.json({ 
             success: true, 
              questions: [
                 `Given your background in ${skills[0] || 'your core skills'}, how would you approach building a ${title} system?`,
-                `Describe a time you solved a complex problem. How did you document and test it?`,
+                `Describe a technical trade-off you made. How did you document and test it?`,
                 `What is the most difficult technical hurdle you foresee in this role, and how would you overcome it?`
              ] 
         });
     }
 
   } catch (error) {
-    console.error("Interview generation failed:", error);
-    return NextResponse.json({ success: false, error: 'Failed to generate interview simulation.' }, { status: 500 });
+    console.error("AI Generation failed:", error);
+    return NextResponse.json({ success: false, error: 'Failed to generate AI data.' }, { status: 500 });
   }
 }

@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { ReactNode, useState, useEffect } from 'react';
 import { LayoutDashboard, Users, Briefcase, ArrowLeft, Building2, LogOut, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
+import { LiquidProgressBar } from '@/components/ui/LiquidProgressBar';
+import GsapMagnetic from '@/components/ui/GsapMagnetic';
 
 const navItems = [
   { href: '/company', label: 'Company Overview', icon: LayoutDashboard },
@@ -62,45 +65,57 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside className="w-64 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col shadow-sm sticky top-0 h-screen overflow-y-auto">
-        <div className="p-6 border-b border-slate-50 flex items-center gap-3">
-          <div className="size-9 rounded-xl bg-amber-600 flex items-center justify-center shadow-lg shadow-amber-600/10 shrink-0">
-            <Building2 size={18} className="text-white" />
-          </div>
-          <span className="font-black text-lg uppercase tracking-tighter font-display text-slate-900 line-clamp-1" title={companyName}>
-            {companyName}
-          </span>
+    <div className="flex min-h-screen bg-slate-50 relative overflow-x-hidden">
+      <LiquidProgressBar />
+      <NeuralParticleField />
+      
+      <aside className="w-64 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col shadow-sm sticky top-0 h-screen overflow-y-auto z-50">
+        <div className="p-6 border-b border-slate-50">
+          <GsapMagnetic>
+            <Link href="/company" className="flex items-center gap-3 no-underline group text-left">
+              <div className="size-9 rounded-xl bg-amber-600 flex items-center justify-center shadow-lg shadow-amber-600/10 shrink-0 group-hover:scale-110 transition-transform duration-500">
+                <Building2 size={18} className="text-white" />
+              </div>
+              <span className="font-black text-lg uppercase tracking-tighter font-display text-slate-900 line-clamp-1 group-hover:text-amber-600 transition-colors" title={companyName}>
+                {companyName}
+              </span>
+            </Link>
+          </GsapMagnetic>
         </div>
 
-        <nav className="p-4 flex flex-col gap-1 pb-8 border-b border-slate-50">
+        <nav className="p-4 flex flex-col gap-1 pb-8 border-b border-slate-50 flex-1">
           {navItems.map(item => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all text-sm font-semibold group"
-            >
-              <item.icon size={18} className="group-hover:text-amber-600 transition-colors" />
-              {item.label}
-            </Link>
+            <GsapMagnetic key={item.href} strength={0.2}>
+              <Link
+                href={item.href}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-all text-sm font-semibold group w-full"
+              >
+                <item.icon size={18} className="group-hover:text-amber-600 transition-colors" />
+                {item.label}
+              </Link>
+            </GsapMagnetic>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-50 space-y-2">
-          <Link
-            href="/auth/login"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all text-sm font-semibold"
-          >
-            <ArrowLeft size={18} />
-            Change Role
-          </Link>
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500/60 hover:text-red-500 hover:bg-red-50 transition-all text-sm font-semibold"
-          >
-            <LogOut size={18} />
-            Sign Out
-          </button>
+        <div className="p-4 border-t border-slate-50 space-y-2 bg-slate-50/50">
+          <GsapMagnetic>
+            <Link
+              href="/auth/login"
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-slate-50 transition-all text-sm font-semibold w-full"
+            >
+              <ArrowLeft size={18} />
+              Change Role
+            </Link>
+          </GsapMagnetic>
+          <GsapMagnetic>
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500/60 hover:text-red-500 hover:bg-red-50 transition-all text-sm font-semibold"
+            >
+              <LogOut size={18} />
+              Sign Out
+            </button>
+          </GsapMagnetic>
         </div>
       </aside>
 

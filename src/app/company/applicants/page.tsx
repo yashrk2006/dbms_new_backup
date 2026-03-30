@@ -57,25 +57,47 @@ export default function ReviewCandidates() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [now, setNow] = useState<number>(0);
   const [aiAssessments, setAiAssessments] = useState<Record<string, string[]>>({});
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
-  const handleGenerateAssessment = (candidate: Candidate) => {
+  const handleGenerateAssessment = async (candidate: Candidate) => {
+    setGeneratingId(candidate.application_id);
     const candidateSkills = candidate.student?.skills?.map(s => s.skill_name) || [];
-    const roleSkills = candidate.internship?.requirements?.role_skills || [];
-    const challenges = AI_ENGINE.generateSkillAssessment(candidateSkills, roleSkills);
+    const roleTitle = candidate.internship?.title || 'this position';
     
-    setAiAssessments(prev => ({
-      ...prev,
-      [candidate.application_id]: challenges
-    }));
-    
-    // Update local state to show questions immediately
-    setCandidates(prev => prev.map(c => 
-      c.application_id === candidate.application_id 
-        ? { ...c, ai_interview_questions: challenges } 
-        : c
-    ));
+    try {
+      const response = await fetch('/api/ai/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skills: candidateSkills,
+          title: roleTitle,
+          scope: 'COMPANY_ASSESSMENT'
+        })
+      });
 
-    toast.success('Technical Assessment Generated', { icon: '⚙️' });
+      const result = await response.json();
+      if (result.success && result.questions) {
+        const challenges = result.questions;
+        setAiAssessments(prev => ({
+          ...prev,
+          [candidate.application_id]: challenges
+        }));
+        
+        setCandidates(prev => prev.map(c => 
+          c.application_id === candidate.application_id 
+            ? { ...c, ai_interview_questions: challenges } 
+            : c
+        ));
+        toast.success('Technical Assessment Generated', { icon: '⚙️' });
+      } else {
+        throw new Error(result.error || 'Failed to generate assessment');
+      }
+    } catch (err) {
+      console.error('AI Assessment failed:', err);
+      toast.error('Failed to connect to Intelligence Engine');
+    } finally {
+      setGeneratingId(null);
+    }
   };
 
   useEffect(() => {
@@ -450,10 +472,24 @@ export default function ReviewCandidates() {
                                   </div>
                                   <button 
                                     onClick={() => handleGenerateAssessment(c)}
-                                    className="px-4 py-2 rounded-xl bg-slate-900 text-white text-[9px] font-black uppercase tracking-[2px] shadow-lg shadow-slate-900/20 hover:bg-amber-600 transition-colors flex items-center gap-2"
+                                    disabled={generatingId === c.application_id}
+                                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[2px] shadow-lg transition-all flex items-center gap-2 ${
+                                      generatingId === c.application_id 
+                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                                        : 'bg-slate-900 text-white shadow-slate-900/20 hover:bg-amber-600'
+                                    }`}
                                   >
-                                     <Sparkles size={10} />
-                                     Refresh AI Queries
+                                     {generatingId === c.application_id ? (
+                                        <>
+                                          <div className="size-3 rounded-full border-2 border-amber-600/30 border-t-amber-600 animate-spin" />
+                                          Scanning Core...
+                                        </>
+                                     ) : (
+                                        <>
+                                          <Sparkles size={10} />
+                                          Refresh AI Queries
+                                        </>
+                                     )}
                                   </button>
                                </div>
 

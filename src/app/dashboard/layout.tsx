@@ -22,6 +22,9 @@ import {
   Shield
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
+import { LiquidProgressBar } from '@/components/ui/LiquidProgressBar';
+import GsapMagnetic from '@/components/ui/GsapMagnetic';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, subtitle: 'SECTION 01' },
@@ -76,26 +79,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-slate-50 relative selection:bg-amber-500/30 overflow-x-hidden" suppressHydrationWarning>
+      <LiquidProgressBar />
       {/* Visual Background Layers */}
       <div className="fixed inset-0 bg-white pointer-events-none z-0" suppressHydrationWarning />
       <div className="fixed inset-0 bg-grid-pattern opacity-5 pointer-events-none z-0" suppressHydrationWarning />
+      <NeuralParticleField />
 
       {/* Sidebar - Desktop Navigation */}
       <aside className="hidden lg:flex w-80 flex-col bg-white border-r border-slate-100 fixed top-0 left-0 h-screen z-50 transition-all duration-500 shadow-sm" suppressHydrationWarning>
         <div className="p-10" suppressHydrationWarning>
-          <Link href="/dashboard" className="flex items-center gap-4 group no-underline" suppressHydrationWarning>
-            <div className="size-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-600/20 group-hover:scale-110 transition-all duration-500" suppressHydrationWarning>
-              <Shield size={24} className="text-white" />
-            </div>
-            <div className="flex flex-col" suppressHydrationWarning>
-              <h2 className="text-slate-900 text-2xl font-black leading-none tracking-tighter uppercase font-display group-hover:text-amber-600 transition-colors">
-                SkillSync
-              </h2>
-              <span className="text-[9px] text-slate-400 font-black uppercase tracking-[0.4em] mt-1">
-                Professional Portfolio
-              </span>
-            </div>
-          </Link>
+          <GsapMagnetic>
+            <Link href="/dashboard" className="flex items-center gap-4 group no-underline" suppressHydrationWarning>
+              <div className="size-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-600/20 group-hover:scale-110 transition-all duration-500" suppressHydrationWarning>
+                <Shield size={24} className="text-white" />
+              </div>
+              <div className="flex flex-col" suppressHydrationWarning>
+                <h2 className="text-slate-900 text-2xl font-black leading-none tracking-tighter uppercase font-display group-hover:text-amber-600 transition-colors">
+                  SkillSync
+                </h2>
+                <span className="text-[9px] text-slate-400 font-black uppercase tracking-[0.4em] mt-1">
+                  Professional Portfolio
+                </span>
+              </div>
+            </Link>
+          </GsapMagnetic>
         </div>
 
         <nav className="px-6 py-4 flex flex-col gap-3 pb-8" suppressHydrationWarning>
@@ -110,34 +117,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               const Icon = item.icon;
               const active = pathname === item.href;
               return (
-                <Link 
-                  key={item.href} 
-                  href={item.href} 
-                  className={`flex items-center gap-5 px-5 py-4 rounded-2xl transition-all duration-500 group relative overflow-hidden border ${
-                    active 
-                      ? "bg-amber-600 border-amber-600 text-white shadow-[0_10px_30px_rgba(217,119,6,0.2)]" 
-                      : "text-slate-500 border-transparent hover:border-amber-500/10 hover:bg-slate-50 hover:text-slate-900"
-                  }`}
-                >
-                  <Icon className={`size-5 transition-all duration-500 ${
-                    active ? "text-white" : "group-hover:text-amber-600 group-hover:scale-110"
-                  }`} />
-                  <div className="flex flex-col" suppressHydrationWarning>
-                      <span className="text-[11px] font-black uppercase tracking-[3px]">{item.label}</span>
-                      <span className={`text-[8px] font-bold uppercase tracking-widest leading-none mt-1 opacity-40 group-hover:opacity-60 transition-opacity ${
-                          active ? "text-white" : "text-slate-400"
-                      }`}>{item.subtitle}</span>
-                  </div>
-                  {active && (
-                    <motion.div 
-                      layoutId="active-nav-glow"
-                      className="absolute inset-x-0 bottom-0 h-1 bg-white/20"
-                    />
-                  )}
-                  <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ChevronRight size={12} className={active ? "text-white" : "text-amber-600/40"} />
-                  </div>
-                </Link>
+                <GsapMagnetic key={item.href} strength={0.3}>
+                  <Link 
+                    href={item.href} 
+                    className={`flex items-center gap-5 px-5 py-4 rounded-2xl transition-all duration-500 group relative overflow-hidden border ${
+                      active 
+                        ? "bg-amber-600 border-amber-600 text-white shadow-[0_10px_30px_rgba(217,119,6,0.2)]" 
+                        : "text-slate-500 border-transparent hover:border-amber-500/10 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <Icon className={`size-5 transition-all duration-500 ${
+                      active ? "text-white" : "group-hover:text-amber-600 group-hover:scale-110"
+                    }`} />
+                    <div className="flex flex-col" suppressHydrationWarning>
+                        <span className="text-[11px] font-black uppercase tracking-[3px]">{item.label}</span>
+                        <span className={`text-[8px] font-bold uppercase tracking-widest leading-none mt-1 opacity-40 group-hover:opacity-60 transition-opacity ${
+                            active ? "text-white" : "text-slate-400"
+                        }`}>{item.subtitle}</span>
+                    </div>
+                    {active && (
+                      <motion.div 
+                        layoutId="active-nav-glow"
+                        className="absolute inset-x-0 bottom-0 h-1 bg-white/20"
+                      />
+                    )}
+                    <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ChevronRight size={12} className={active ? "text-white" : "text-amber-600/40"} />
+                    </div>
+                  </Link>
+                </GsapMagnetic>
               );
             })}
           </div>
@@ -160,13 +168,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 System Status: Production
              </p>
           </div>
-          <button 
-            className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl border border-red-500/20 text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all duration-500 group"
-            onClick={handleSignOut}
-          >
-            <LogOut className="size-5 transition-transform group-hover:-translate-x-1" />
-            <span className="text-[11px] font-black uppercase tracking-[3px]">Sign Out</span>
-          </button>
+          <GsapMagnetic>
+            <button 
+              className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl border border-red-500/20 text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all duration-500 group"
+              onClick={handleSignOut}
+            >
+              <LogOut className="size-5 transition-transform group-hover:-translate-x-1" />
+              <span className="text-[11px] font-black uppercase tracking-[3px]">Sign Out</span>
+            </button>
+          </GsapMagnetic>
         </div>
       </aside>
 
