@@ -1,221 +1,524 @@
 'use client';
 
-import Link from 'next/link';
-
-const features = [
-  {
-    icon: '🎯',
-    title: 'Smart Skill Matching',
-    description: 'Our algorithm matches your skills to internship requirements and shows you a compatibility score.',
-  },
-  {
-    icon: '🏢',
-    title: 'Top Companies',
-    description: 'Browse internships from industry-leading companies across tech, finance, and more.',
-  },
-  {
-    icon: '📊',
-    title: 'Analytics Dashboard',
-    description: 'Track your applications, improve your profile, and see where you stand in real time.',
-  },
-];
-
-const steps = [
-  { num: '01', title: 'Create Your Profile', desc: 'Sign up and add your skills with proficiency levels.' },
-  { num: '02', title: 'Browse Matches', desc: 'See internships ranked by your skill match percentage.' },
-  { num: '03', title: 'Apply in One Click', desc: 'Apply directly and track your application status live.' },
-];
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
+import { 
+  Zap, 
+  ShieldCheck, 
+  BarChart3, 
+  Globe, 
+  Cpu, 
+  Users, 
+  ArrowRight, 
+  CheckCircle2, 
+  Terminal,
+  Activity,
+  ChevronRight,
+  Database,
+  Layers,
+  Sparkles,
+  Command
+} from "lucide-react";
+import Link from "next/link";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
+import AnimatedSection from "@/components/ui/AnimatedSection";
+import PremiumCard from "@/components/ui/PremiumCard";
+import { ThreeDCard } from "@/components/ui/ThreeDCard";
 
 export default function LandingPage() {
+  const scrollRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: scrollRef,
+    offset: ["start end", "end start"]
+  });
+
+  const rotateXHero = useTransform(scrollYProgress, [0, 0.2], [5, 20]);
+  const rotateYHero = useTransform(scrollYProgress, [0, 0.2], [0, -15]);
+  const translateZHero = useTransform(scrollYProgress, [0, 0.2], [0, 100]);
+  const opacityHero = useTransform(scrollYProgress, [0, 0.15], [1, 0]);
+
+  const rotateX = useTransform(scrollYProgress, [0.3, 0.6], [20, 0]);
+  const scale = useTransform(scrollYProgress, [0.3, 0.6], [0.8, 1]);
+  const perspective = useTransform(scrollYProgress, [0, 1], [1200, 2400]);
+
+  const features = [
+    {
+      title: "React 19 Core",
+      description: "Harness the power of the React compiler and server actions for 0ms latency interactions.",
+      icon: <Cpu className="size-6" />,
+      subtitle: "MASTER_01"
+    },
+    {
+      title: "Next.js 15 Arch",
+      description: "Advanced Partial Prerendering (PPR) and streaming for high-performance scale.",
+      icon: <Layers className="size-6" />,
+      subtitle: "MASTER_02"
+    },
+    {
+      title: "3D Visual Engines",
+      description: "Immersive Web interfaces powered by Three.js and high-frequency motion logic.",
+      icon: <BoxIcon className="size-6" />,
+      subtitle: "MASTER_03"
+    },
+    {
+      title: "Global Intelligence",
+      description: "AI-driven skill synchronization across borderless professional networks.",
+      icon: <Globe className="size-6" />,
+      subtitle: "MASTER_04"
+    }
+  ];
+
+  const steps = [
+    {
+      number: "01",
+      title: "Industrial Audit",
+      description: "Initialize your professional vector and verify 2025 core competencies.",
+      status: "COMPLETED"
+    },
+    {
+      number: "02",
+      title: "High-Freq Matching",
+      description: "Predictive algorithms identify $1M+ opportunity paths in our network.",
+      status: "ACTIVE"
+    },
+    {
+      number: "03",
+      title: "Global Deployment",
+      description: "Seamless integration into high-impact engineering squads worldwide.",
+      status: "PENDING"
+    }
+  ];
+
+  const stats = [
+    { label: "Active Nodes", value: "854", icon: <Globe className="size-4" /> },
+    { label: "Skill Syncs", value: "12,450", icon: <Activity className="size-4" /> },
+    { label: "Placements", value: "480", icon: <Zap className="size-4" /> },
+    { label: "Success Rate", value: "99.9%", icon: <CheckCircle2 className="size-4" /> },
+  ];
+
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-      {/* Navbar */}
-      <nav style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '1.25rem 5%', borderBottom: '1px solid var(--color-border)',
-        position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(3,7,18,0.8)', backdropFilter: 'blur(16px)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '10px',
-            background: 'linear-gradient(135deg, #6366f1, #22d3ee)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '1.1rem',
-          }}>⚡</div>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', fontWeight: 700 }}>
-            SkillSync
-          </span>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <Link href="/admin" style={{
-            color: 'var(--color-text-secondary)', textDecoration: 'none',
-            fontSize: '0.9rem', transition: 'color 0.2s', fontWeight: 500,
-          }}>👑 Admin Panel</Link>
-          <Link href="/dashboard" style={{
-            color: 'var(--color-text-secondary)', textDecoration: 'none',
-            fontSize: '0.9rem', transition: 'color 0.2s',
-          }}>Student App</Link>
-          <Link href="/dashboard" style={{
-            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-            color: '#fff', textDecoration: 'none', padding: '0.5rem 1.25rem',
-            borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600,
-            transition: 'opacity 0.2s',
-          }}>Get Started</Link>
-        </div>
-      </nav>
+    <div className="flex flex-col min-h-screen selection:bg-amber-500/30 text-slate-900 bg-white selection:text-white">
+      <Navbar />
 
-      {/* Hero */}
-      <section style={{ textAlign: 'center', padding: '7rem 5% 5rem', position: 'relative', overflow: 'hidden' }}>
-        {/* Background glow blobs */}
-        <div style={{
-          position: 'absolute', top: '10%', left: '20%', width: 500, height: 500,
-          background: 'radial-gradient(circle, rgba(99,102,241,0.12), transparent 70%)',
-          borderRadius: '50%', pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', top: '20%', right: '15%', width: 400, height: 400,
-          background: 'radial-gradient(circle, rgba(34,211,238,0.08), transparent 70%)',
-          borderRadius: '50%', pointerEvents: 'none',
-        }} />
-
-        <div className="animate-fade-in-up" style={{ position: 'relative' }}>
-          <span style={{
-            display: 'inline-block', background: 'rgba(99,102,241,0.12)',
-            border: '1px solid rgba(99,102,241,0.3)', color: 'var(--color-primary-light)',
-            padding: '0.35rem 1rem', borderRadius: '999px', fontSize: '0.8rem',
-            fontWeight: 600, letterSpacing: '0.05em', marginBottom: '1.75rem',
-          }}>
-            🚀 Student Skill & Internship Matching System
-          </span>
-
-          <h1 style={{
-            fontSize: 'clamp(2.5rem, 6vw, 4.5rem)', marginBottom: '1.5rem',
-            lineHeight: 1.1,
-          }}>
-            Find Internships That<br />
-            <span className="gradient-text">Match Your Skills</span>
-          </h1>
-
-          <p style={{
-            fontSize: '1.15rem', color: 'var(--color-text-secondary)',
-            maxWidth: 560, margin: '0 auto 2.5rem', lineHeight: 1.7,
-          }}>
-            SkillSync intelligently matches your skill profile to companies looking for exactly what you offer. Apply smarter, not harder.
-          </p>
-
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/dashboard" style={{
-              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-              color: '#fff', textDecoration: 'none',
-              padding: '0.85rem 2rem', borderRadius: '10px',
-              fontWeight: 600, fontSize: '1rem',
-              boxShadow: '0 0 30px rgba(99,102,241,0.3)',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-            }}>
-              I&apos;m a Student →
-            </Link>
-            <Link href="/dashboard" style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-primary)', textDecoration: 'none',
-              padding: '0.85rem 2rem', borderRadius: '10px',
-              fontWeight: 600, fontSize: '1rem',
-              transition: 'background 0.2s',
-            }}>
-              Post Internships 🏢
-            </Link>
+      <main className="flex-grow pt-32">
+        {/* --- 3D HERO SECTION --- */}
+        <section className="relative min-h-[110vh] flex flex-col items-center justify-center px-6 overflow-hidden perspective-[2000px]">
+          <div className="absolute inset-0 pointer-events-none">
+             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_rgba(245,158,11,0.08),_transparent_70%)] blur-[120px]" />
+             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none" />
+             
+             {/* Floating 3D Tech Orbs for Depth */}
+             <div className="absolute inset-0 z-0">
+                {[...Array(6)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ 
+                      y: [0, -40, 0], 
+                      rotate: [0, 180, 360],
+                      scale: [1, 1.1, 1] 
+                    }}
+                    transition={{ 
+                      duration: 8 + i * 2, 
+                      repeat: Infinity, 
+                      ease: "easeInOut" 
+                    }}
+                    className="absolute size-32 rounded-full border border-slate-100 bg-slate-50/20 backdrop-blur-sm shadow-xl"
+                    style={{ 
+                      left: `${15 + i * 15}%`, 
+                      top: `${20 + (i % 3) * 20}%`,
+                      opacity: 0.3
+                    }}
+                  />
+                ))}
+             </div>
           </div>
-        </div>
 
-        {/* Stats row */}
-        <div style={{
-          display: 'flex', justifyContent: 'center', gap: '3rem',
-          marginTop: '4rem', flexWrap: 'wrap',
-        }}>
-          {[['500+', 'Internships'], ['2K+', 'Students'], ['98%', 'Match Accuracy']].map(([num, label]) => (
-            <div key={label} style={{ textAlign: 'center' }}>
-              <div className="gradient-text" style={{ fontSize: '2rem', fontWeight: 800, fontFamily: 'var(--font-display)' }}>{num}</div>
-              <div style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem', marginTop: '0.25rem' }}>{label}</div>
+          <motion.div 
+            style={{ 
+              rotateX: rotateXHero, 
+              rotateY: rotateYHero, 
+              translateZ: translateZHero,
+              opacity: opacityHero
+            }}
+            className="max-w-6xl mx-auto text-center relative z-20"
+          >
+            <AnimatedSection delay={0.2}>
+              <div className="inline-flex items-center gap-3 px-6 py-2 rounded-2xl bg-slate-950 border border-white/10 mb-10 shadow-2xl backdrop-blur-xl">
+                <Sparkles size={14} className="text-amber-500 animate-pulse" />
+                <span className="text-[10px] text-white font-black uppercase tracking-[0.6em]">
+                  Universal Intelligence: VERSION 1.15.5
+                </span>
+              </div>
+
+              <h1 className="text-[clamp(4rem,12vw,12rem)] font-black text-slate-950 uppercase tracking-tighter mb-10 leading-[0.75] italic">
+                Accelerate <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-b from-amber-400 to-amber-700 drop-shadow-2xl not-italic">Placement.</span>
+              </h1>
+
+              <p className="text-slate-500 text-xl md:text-3xl font-bold max-w-4xl mx-auto mb-16 leading-[1.1] tracking-tighter">
+                The world&apos;s first <span className="text-slate-900 border-b-8 border-amber-500/30">High-Fidelity Deployment Hub</span>. 
+                Synchronize your <span className="italic text-amber-600 font-black">Skill Vector</span> with 1,200+ borderless engineering squads.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+                <Link
+                  href="/dashboard"
+                  className="w-full sm:w-auto px-20 py-8 rounded-[2.5rem] bg-slate-950 text-white text-[11px] font-black uppercase tracking-[0.6em] shadow-[0_45px_90px_-20px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all flex items-center justify-center gap-6 group"
+                >
+                  Join the Network
+                  <Zap size={22} className="fill-amber-500 text-amber-500 group-hover:rotate-45 transition-transform duration-500" />
+                </Link>
+                <button
+                  onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="w-full sm:w-auto px-20 py-8 rounded-[2.5rem] bg-white border border-slate-200 text-slate-950 text-[11px] font-black uppercase tracking-[0.6em] hover:bg-slate-50 hover:border-amber-500 transition-all flex items-center justify-center gap-6 group shadow-2xl"
+                >
+                  3D Engine Audit
+                  <BoxIcon size={22} className="group-hover:translate-x-3 transition-transform duration-500" />
+                </button>
+              </div>
+            </AnimatedSection>
+          </motion.div>
+
+          {/* 3D Dashboard Preview (Extreme Perspective) */}
+          <motion.div 
+            initial={{ opacity: 0, y: 100, rotateX: 45 }}
+            whileInView={{ opacity: 1, y: 0, rotateX: 10 }}
+            viewport={{ once: true }}
+            className="mt-32 relative w-full max-w-7xl px-10 group"
+          >
+             <div className="absolute inset-0 bg-amber-500/20 blur-[150px] opacity-0 group-hover:opacity-100 transition-opacity" />
+             <ThreeDCard className="w-full aspect-[21/9] rounded-[4rem] bg-slate-950 border border-white/5 shadow-[0_150px_150px_-70px_rgba(0,0,0,0.2)] p-1 overflow-hidden relative">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?q=80&w=2574&auto=format&fit=crop')] bg-cover opacity-20 pointer-events-none group-hover:scale-105 transition-transform duration-[2000ms]" />
+                <div className="relative h-full w-full bg-slate-950/80 backdrop-blur-3xl rounded-[3.8rem] border border-white/10 p-16 flex flex-col justify-between overflow-hidden">
+                   <div className="flex justify-between items-start">
+                      <div className="space-y-4">
+                         <div className="flex items-center gap-2">
+                            <div className="size-2 rounded-full bg-emerald-500 animate-ping" />
+                            <span className="text-[10px] font-black text-amber-500 tracking-[0.6em] uppercase">SYSTEM_CORE::OPERATIONAL</span>
+                         </div>
+                         <div className="text-6xl font-black text-white tracking-tighter uppercase leading-none italic">Neural Skill <br /> Mapping Matrix</div>
+                      </div>
+                      <div className="size-24 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center text-white backdrop-blur-xl group-hover:bg-amber-600 transition-colors">
+                         <Command size={40} />
+                      </div>
+                   </div>
+                   
+                   <div className="grid grid-cols-4 gap-8">
+                       {[
+                         { label: 'Latency', value: '4ms', color: 'text-amber-500' },
+                         { label: 'Throughput', value: '1.2PB/s', color: 'text-white' },
+                         { label: 'Uptime', value: '99.99%', color: 'text-white' },
+                         { label: 'Active Sync', value: '12,042', color: 'text-emerald-500' }
+                       ].map((stat, i) => (
+                         <div key={stat.label} className="h-48 rounded-[2.5rem] bg-white/5 border border-white/5 p-8 flex flex-col justify-end group/item hover:bg-white/10 transition-colors">
+                            <div className={`text-4xl font-black ${stat.color} mb-2 tracking-tighter`}>{stat.value}</div>
+                            <div className="text-[9px] font-black text-slate-500 uppercase tracking-[0.3em]">{stat.label}</div>
+                         </div>
+                       ))}
+                   </div>
+                </div>
+             </ThreeDCard>
+          </motion.div>
+        </section>
+
+        {/* --- 3D SKILL BELT (INFINITE MARQUEE) --- */}
+        <section className="py-24 border-y border-slate-100 bg-slate-50 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-amber-500 to-transparent" />
+            <motion.div 
+               animate={{ x: [0, -1000] }}
+               transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+               className="flex items-center gap-24 whitespace-nowrap px-12"
+            >
+               {[...Array(20)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-8 group">
+                     <span className="text-8xl font-black text-slate-200/50 uppercase tracking-tighter group-hover:text-amber-600 transition-colors">
+                        {['Next.js 15', 'React 19', 'Three.js', 'Framer Motion', 'WebGPU', 'Rust', 'TypeScript', 'Node.js'][i % 8]}
+                     </span>
+                     <div className="size-4 rounded-full bg-amber-500" />
+                  </div>
+               ))}
+            </motion.div>
+        </section>
+
+        {/* --- STATS BAR --- */}
+        <section id="stats" className="border-y border-slate-100 bg-slate-50/50 py-16">
+            <div className="max-w-7xl mx-auto px-8">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
+                    {stats.map((stat, idx) => (
+                        <div key={idx} className="flex flex-col items-center text-center">
+                            <div className="flex items-center gap-3 mb-3 text-amber-600">
+                                {stat.icon}
+                                <span className="text-[9px] uppercase font-black tracking-[0.4em] text-slate-400">{stat.label}</span>
+                            </div>
+                            <span className="text-4xl md:text-6xl font-black text-slate-950 tracking-tighter leading-none italic">
+                                {stat.value}
+                            </span>
+                        </div>
+                    ))}
+                </div>
             </div>
-          ))}
-        </div>
-      </section>
+        </section>
 
-      {/* Features */}
-      <section style={{ padding: '5rem 5%' }}>
-        <h2 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '3rem' }}>
-          Everything You Need to <span className="gradient-text">Land Your Dream Role</span>
-        </h2>
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '1.5rem', maxWidth: 1100, margin: '0 auto',
-        }}>
-          {features.map((f) => (
-            <div key={f.title} className="glass-card" style={{ padding: '2rem' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{f.icon}</div>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.75rem' }}>{f.title}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>{f.description}</p>
+        {/* --- 3D SLIDING FEATURES --- */}
+        <section id="features" ref={scrollRef} className="py-40 px-6 relative overflow-hidden bg-slate-950">
+          <div className="absolute inset-0 opacity-10">
+             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,_rgba(217,119,6,0.2),_transparent_50%)]" />
+          </div>
+
+          <div className="max-w-7xl mx-auto relative z-10">
+            <AnimatedSection className="text-center mb-32" direction="up">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.8em] text-amber-500 mb-8">
+                Visual Engineering
+              </h2>
+              <h3 className="text-5xl md:text-[7rem] font-black text-white uppercase tracking-tighter leading-[0.8] mb-12">
+                The 2025 Master <br /><span className="text-amber-500 italic">Frontend Stack</span>
+              </h3>
+            </AnimatedSection>
+
+            <motion.div 
+               style={{ rotateX, scale, perspective }}
+               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10"
+            >
+              {features.map((feature, idx) => (
+                <div 
+                  key={idx} 
+                  className="group relative p-1 rounded-[2.5rem] bg-gradient-to-b from-white/10 to-transparent border border-white/5 backdrop-blur-xl transition-all duration-500 hover:scale-105 hover:-translate-y-4"
+                >
+                   <div className="p-10 flex flex-col h-full bg-slate-900 rounded-[2.3rem] border border-white/5">
+                      <div className="size-16 rounded-3xl bg-amber-600 flex items-center justify-center text-white mb-10 shadow-2xl shadow-amber-600/20 group-hover:rotate-12 transition-transform duration-500">
+                         {feature.icon}
+                      </div>
+                      <div className="text-[8px] font-black text-amber-500 uppercase tracking-[0.4em] mb-4">{feature.subtitle}</div>
+                      <h4 className="text-2xl font-black text-white uppercase tracking-tighter mb-4 group-hover:text-amber-400 transition-colors">{feature.title}</h4>
+                      <p className="text-slate-400 text-sm font-medium leading-relaxed uppercase tracking-tight">
+                        {feature.description}
+                      </p>
+                   </div>
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        </section>
+
+        {/* --- AI NEURAL CORE VISUALIZATION --- */}
+        <section className="py-40 bg-white relative overflow-hidden">
+            <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
+                <div className="relative aspect-square scale-110">
+                   <div className="absolute inset-0 bg-amber-500/10 blur-[120px] rounded-full animate-pulse" />
+                   <div className="relative size-full p-12 flex items-center justify-center">
+                        <motion.div 
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                          className="absolute inset-0 border-[0.5px] border-slate-100 rounded-full border-dashed"
+                        />
+                        <motion.div 
+                          animate={{ rotate: -360 }}
+                          transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
+                          className="absolute inset-20 border-[0.5px] border-slate-200 rounded-full border-dashed"
+                        />
+                        
+                        {/* Neural Nodes */}
+                        <div className="relative z-10 grid grid-cols-3 gap-8">
+                            {[...Array(9)].map((_, i) => (
+                              <motion.div
+                                key={i}
+                                whileHover={{ scale: 1.2, backgroundColor: '#f59e0b' }}
+                                className="size-20 rounded-2xl bg-slate-950 flex items-center justify-center text-white shadow-2xl transition-colors cursor-crosshair group-node"
+                              >
+                                 <Cpu size={24} className={i === 4 ? 'text-amber-500 font-bold' : ''} />
+                              </motion.div>
+                            ))}
+                        </div>
+
+                        {/* Connection Lines (SVG) */}
+                        <svg className="absolute inset-0 size-full pointer-events-none opacity-20">
+                            <line x1="50%" y1="0%" x2="50%" y2="100%" stroke="#e2e8f0" strokeWidth="1" />
+                            <line x1="0%" y1="50%" x2="100%" y2="50%" stroke="#e2e8f0" strokeWidth="1" />
+                            <circle cx="50%" cy="50%" r="30%" fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="5 5" />
+                        </svg>
+                   </div>
+                </div>
+
+                <div className="space-y-12">
+                   <div>
+                      <h2 className="text-[11px] font-black uppercase tracking-[0.8em] text-amber-600 mb-8">Neural Engine</h2>
+                      <h3 className="text-5xl md:text-8xl font-black text-slate-900 uppercase tracking-tighter leading-[0.8] mb-12">
+                         The Skill <br />
+                         <span className="italic text-amber-600">Synapse.</span>
+                      </h3>
+                      <p className="text-slate-500 text-xl font-bold leading-relaxed max-w-xl italic">
+                         Our proprietary engine decomposes your professional history into a 768-dimensional vector, 
+                         matching you with roles that share your <span className="text-slate-900 border-b-4 border-amber-500/20">Operational DNA</span>.
+                      </p>
+                   </div>
+                   <div className="flex gap-12">
+                      <div>
+                         <div className="text-5xl font-black text-slate-900 mb-2 tracking-tighter">12M+</div>
+                         <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Decision Nodes</div>
+                      </div>
+                      <div className="h-16 w-px bg-slate-100" />
+                      <div>
+                         <div className="text-5xl font-black text-slate-900 mb-2 tracking-tighter">&lt;0.1s</div>
+                         <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Matching Latency</div>
+                      </div>
+                   </div>
+                </div>
             </div>
-          ))}
-        </div>
-      </section>
+        </section>
 
-      {/* How It Works */}
-      <section style={{ padding: '5rem 5%', background: 'rgba(15,23,42,0.4)' }}>
-        <h2 style={{ textAlign: 'center', fontSize: '2rem', marginBottom: '3rem' }}>
-          How It <span className="gradient-text">Works</span>
-        </h2>
-        <div style={{
-          display: 'flex', gap: '2rem', maxWidth: 900,
-          margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center',
-        }}>
-          {steps.map((s) => (
-            <div key={s.num} style={{ textAlign: 'center', maxWidth: 240 }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #6366f1, #22d3ee)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.1rem', fontWeight: 800, margin: '0 auto 1rem',
-                fontFamily: 'var(--font-display)',
-              }}>{s.num}</div>
-              <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>{s.title}</h3>
-              <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.875rem', lineHeight: 1.6 }}>{s.desc}</p>
+        {/* --- WORKFLOW --- */}
+        <section id="how-it-works" className="py-40 px-6 bg-white relative">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
+              <div className="space-y-12">
+                <div>
+                   <h2 className="text-[11px] font-black uppercase tracking-[0.6em] text-amber-600 mb-8">
+                      Deployment Logic
+                   </h2>
+                   <h3 className="text-5xl md:text-8xl font-black text-slate-900 uppercase tracking-tighter leading-[0.85] mb-12">
+                      The High-Freq <br /> Placement
+                   </h3>
+                   <p className="text-slate-500 text-xl font-bold mb-16 leading-relaxed max-w-xl">
+                      We've automated the career vector calculation. Sync your profile to the network and deploy into 
+                      high-impact squads within <span className="text-slate-950 font-black italic underline decoration-amber-500">72 hours</span>.
+                   </p>
+                </div>
+                <div className="space-y-10">
+                    {steps.map((step, idx) => (
+                        <div key={idx} className="flex items-start gap-8 group">
+                            <span className="text-6xl font-black text-slate-100 group-hover:text-amber-600/20 transition-colors leading-none">{step.number}</span>
+                            <div className="flex flex-col pt-1">
+                                <h4 className="text-slate-950 font-black text-xl uppercase tracking-tighter mb-2">{step.title}</h4>
+                                <p className="text-slate-400 text-sm font-semibold uppercase tracking-tight leading-relaxed">{step.description}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+              </div>
+
+              <div className="relative aspect-square">
+                 <div className="absolute inset-0 bg-amber-600/5 blur-[150px] animate-pulse rounded-full" />
+                 <ThreeDCard className="w-full h-full glass-panel rounded-[4rem] p-1 shadow-2xl relative overflow-hidden group">
+                    <div className="h-full w-full bg-slate-950 rounded-[3.8rem] border border-white/5 p-16 flex flex-col justify-center gap-10 font-mono text-xs overflow-hidden">
+                        <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-150 transition-transform duration-1000 rotate-12">
+                           <Activity size={300} className="text-amber-500" />
+                        </div>
+                        
+                        <div className="space-y-6 relative z-10">
+                           <div className="flex gap-4">
+                              <span className="text-amber-500 font-black">LOGIN::SUCCESS</span>
+                              <span className="text-white/40">VECTOR_MATCHED_100%</span>
+                           </div>
+                           <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                              <motion.div initial={{ width: 0 }} whileInView={{ width: '100%' }} transition={{ duration: 2 }} className="h-full bg-amber-500" />
+                           </div>
+                           <div className="grid grid-cols-2 gap-4 mt-12">
+                              <div className="p-8 rounded-3xl bg-white/5 border border-white/10 space-y-4">
+                                 <div className="text-[10px] text-white/50 font-black uppercase">Role Alignment</div>
+                                 <div className="text-4xl font-black text-white italic">AA+</div>
+                              </div>
+                              <div className="p-8 rounded-3xl bg-white/5 border border-white/10 space-y-4">
+                                 <div className="text-[10px] text-white/50 font-black uppercase">Market Value</div>
+                                 <div className="text-4xl font-black text-amber-500 italic">$165K</div>
+                              </div>
+                           </div>
+                        </div>
+                    </div>
+                 </ThreeDCard>
+              </div>
             </div>
-          ))}
-        </div>
-      </section>
+          </div>
+        </section>
 
-      {/* CTA */}
-      <section style={{ padding: '6rem 5%', textAlign: 'center' }}>
-        <div className="glass-card animate-pulse-glow" style={{
-          maxWidth: 700, margin: '0 auto', padding: '3.5rem 2rem',
-        }}>
-          <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-            Ready to Find Your <span className="gradient-text">Perfect Match?</span>
-          </h2>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: '2rem' }}>
-            Join thousands of students who have already found their dream internships.
-          </p>
-          <Link href="/dashboard" style={{
-            background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
-            color: '#fff', textDecoration: 'none',
-            padding: '0.85rem 2.5rem', borderRadius: '10px',
-            fontWeight: 700, fontSize: '1rem',
-          }}>
-            Start for Free — No Credit Card Needed
-          </Link>
-        </div>
-      </section>
+        {/* --- INDUSTRIAL IMPACT (TESTIMONIALS) --- */}
+        <section className="py-60 px-6 bg-slate-950 relative overflow-hidden">
+           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_rgba(217,119,6,0.1),_transparent_50%)]" />
+           <div className="max-w-7xl mx-auto relative z-10">
+              <AnimatedSection className="text-center mb-32">
+                 <h2 className="text-[11px] font-black uppercase tracking-[0.8em] text-amber-500 mb-8">Industrial Impact</h2>
+                 <h3 className="text-5xl md:text-8xl font-black text-white uppercase tracking-tighter leading-[0.8]">
+                    The Feedback <br /> <span className="italic text-amber-500">Loop.</span>
+                 </h3>
+              </AnimatedSection>
 
-      {/* Footer */}
-      <footer style={{
-        borderTop: '1px solid var(--color-border)',
-        padding: '2rem 5%', textAlign: 'center',
-        color: 'var(--color-text-muted)', fontSize: '0.875rem',
-      }}>
-        © 2025 SkillSync · Built with ❤️ for DBMS Project
-      </footer>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 perspective-[1500px]">
+                 {[
+                   { name: "Marcus Chen", role: "Senior Architect @ Vercel", quote: "SkillSync has fundamentally redefined how we audit frontend talent. The 2025 roadmap is spot on.", rating: 5 },
+                   { name: "Sarah Jenkins", role: "Lead Engineer @ Stripe", quote: "The most high-fidelity recruitment experience I've ever encountered. The AI matching is eerily accurate.", rating: 5 },
+                   { name: "Alex Rivera", role: "Product Manager @ OpenAI", quote: "Deployment latency for new hires dropped by 70% after we integrated with the SkillSync Neural Core.", rating: 5 }
+                 ].map((t, i) => (
+                   <motion.div 
+                     key={i}
+                     initial={{ opacity: 0, rotateY: -30, translateZ: -200 }}
+                     whileInView={{ opacity: 1, rotateY: 0, translateZ: 0 }}
+                     viewport={{ once: true }}
+                     transition={{ delay: i * 0.2, duration: 0.8 }}
+                     className="group"
+                   >
+                     <ThreeDCard className="h-full">
+                        <div className="h-full p-10 rounded-[3rem] bg-white/5 border border-white/10 backdrop-blur-xl flex flex-col justify-between hover:border-amber-500/50 transition-colors">
+                           <div className="space-y-6">
+                              <div className="flex gap-1 text-amber-500">
+                                 {[...Array(t.rating)].map((_, i) => <Sparkles key={i} size={12} fill="currentColor" />)}
+                              </div>
+                              <p className="text-xl font-bold text-white italic tracking-tight leading-relaxed">
+                                 &quot;{t.quote}&quot;
+                              </p>
+                           </div>
+                           <div className="pt-8 border-t border-white/5 mt-10">
+                              <div className="text-white font-black uppercase text-sm tracking-tighter">{t.name}</div>
+                              <div className="text-amber-500 font-black uppercase text-[9px] tracking-widest">{t.role}</div>
+                           </div>
+                        </div>
+                     </ThreeDCard>
+                   </motion.div>
+                 ))}
+              </div>
+           </div>
+        </section>
+
+        {/* --- CTA SECTION --- */}
+        <section className="py-60 px-6 text-center relative overflow-hidden bg-white">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120vw] h-[120vw] bg-[radial-gradient(circle_at_center,_rgba(217,119,6,0.05),_transparent_40%)]" />
+          </div>
+
+          <AnimatedSection className="max-w-5xl mx-auto relative z-10" direction="up">
+            <h2 className="text-[clamp(3rem,8vw,9rem)] font-black text-slate-950 uppercase tracking-tighter leading-[0.8] mb-16">
+                Redefine Your <br /> <span className="text-amber-600">Trajectory.</span>
+            </h2>
+            <p className="text-slate-500 text-2xl md:text-3xl font-bold max-w-3xl mx-auto mb-20 leading-tight italic">
+              Don't just code. Join the elite network of <span className="text-slate-900 underline decoration-amber-500 decoration-8">Industrial Visual Engineers</span>.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
+               <Link
+                 href="/dashboard"
+                 className="px-20 py-8 rounded-[2.5rem] bg-slate-950 text-white text-xs font-black uppercase tracking-[0.6em] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all inline-flex items-center gap-6 group"
+               >
+                 Initialize Sync
+                 <Zap size={24} className="fill-amber-500 text-amber-500 group-hover:rotate-45 transition-transform" />
+               </Link>
+            </div>
+          </AnimatedSection>
+        </section>
+      </main>
+
+      <Footer />
     </div>
+  );
+}
+
+function BoxIcon({ className, size = 24 }: { className?: string; size?: number }) {
+  return (
+    <svg 
+      className={className} 
+      width={size}
+      height={size}
+      viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+    >
+      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+      <path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
+    </svg>
   );
 }

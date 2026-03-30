@@ -1,9 +1,28 @@
 import type { Metadata } from "next";
+import { Inter, Public_Sans, DM_Mono } from "next/font/google";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { Toaster } from 'react-hot-toast';
 import "./globals.css";
 
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-display",
+});
+
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  variable: "--font-body",
+});
+
+const dmMono = DM_Mono({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
+
 export const metadata: Metadata = {
-  title: "SkillSync – Student Skill & Internship Matching",
-  description: "Connect students with internships that match their skills. Powered by intelligent skill-matching.",
+  title: "SkillSync | Professional Talent Platform",
+  description: "Advanced career development and professional internship matching platform.",
 };
 
 export default function RootLayout({
@@ -12,12 +31,32 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-      </head>
-      <body suppressHydrationWarning>{children}</body>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${publicSans.variable} ${dmMono.variable}`}>
+      <body suppressHydrationWarning className="min-h-screen bg-background text-foreground font-body antialiased relative overflow-x-hidden">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          {/* Premium Background Architecture */}
+          <div className="fixed inset-0 pointer-events-none z-[-1]" suppressHydrationWarning>
+             <div className="absolute inset-0 bg-mesh-gradient opacity-100" suppressHydrationWarning />
+             <div className="absolute inset-0 bg-grid-pattern opacity-100" suppressHydrationWarning />
+          </div>
+
+          {/* Global Frame Overlay */}
+          <div className="fixed inset-0 pointer-events-none border border-border/5 z-20" suppressHydrationWarning />
+
+          <div className="relative z-10" suppressHydrationWarning>
+            <Toaster 
+              position="top-right"
+              toastOptions={{
+                className: 'bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-white/10 rounded-2xl p-4 shadow-2xl',
+                success: {
+                  iconTheme: { primary: '#10b981', secondary: '#fff' }
+                }
+              }}
+            />
+            {children}
+          </div>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

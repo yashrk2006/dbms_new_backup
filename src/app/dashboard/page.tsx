@@ -1,270 +1,426 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  ClipboardList, 
-  Zap, 
-  Briefcase, 
-  ArrowRight,
-  TrendingUp,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Search,
-  UserCircle,
-  Sparkles as SparklesIcon
+  ClipboardList, Zap, Briefcase, ArrowRight, TrendingUp, Clock,
+  CheckCircle2, AlertCircle, Search, UserCircle, ChevronRight,
+  Activity, Target, BookOpen, Cpu, Star, BarChart3, Sparkles,
+  MessageSquare, Flame, Award, Globe, Code, ShieldCheck, Play
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import { ThreeDCard } from '@/components/ui/ThreeDCard';
+import { AI_ENGINE } from '@/lib/ai-engine';
 
-interface Stats {
-  applications: number;
-  skills: number;
-  matchedInternships: number;
-}
-
-const statusConfig: Record<string, { color: 'warning' | 'primary' | 'success' | 'danger' | 'secondary', icon: any }> = {
-  'Pending': { color: 'warning', icon: Clock },
-  'Under Review': { color: 'primary', icon: Search },
-  'Interviewing': { color: 'primary', icon: TrendingUp },
-  'Accepted': { color: 'success', icon: CheckCircle2 },
-  'Rejected': { color: 'danger', icon: AlertCircle },
+const statusConfig: Record<string, { color: string; bg: string; border: string; icon: any }> = {
+  'Pending':      { color: 'text-slate-500',  bg: 'bg-slate-50',   border: 'border-slate-100',  icon: Clock         },
+  'Under Review': { color: 'text-amber-600',  bg: 'bg-amber-50',   border: 'border-amber-100',  icon: Search        },
+  'Interviewing': { color: 'text-indigo-600', bg: 'bg-indigo-50',  border: 'border-indigo-100', icon: MessageSquare },
+  'Accepted':     { color: 'text-emerald-600',bg: 'bg-emerald-50', border: 'border-emerald-100',icon: CheckCircle2  },
+  'Rejected':     { color: 'text-red-500',    bg: 'bg-red-50',     border: 'border-red-100',    icon: AlertCircle   },
 };
 
+import { Student, Application } from '@/types';
+
 export default function DashboardPage() {
-  const supabase = createClient();
-  const [userEmail, setUserEmail] = useState('');
-  const [stats, setStats] = useState<Stats>({ applications: 0, skills: 0, matchedInternships: 0 });
-  const [recentApplications, setRecentApplications] = useState<Array<{
-    application_id: number;
-    applied_date: string;
-    status: string;
-    internship: { title: string; company: { company_name: string } | null } | null;
-  }>>([]);
+  const router = useRouter();
+  const [userName, setUserName] = useState('');
+  const [stats, setStats] = useState({ applications: 0, skills: 0, internships: 0, accepted: 0 });
+  const [recentApplications, setRecentApplications] = useState<Application[]>([]);
+  const [completionPct, setCompletionPct] = useState(0);
+  const [marketIntelligence, setMarketIntelligence] = useState<{ marketReach: number, highImpact: { name: string, boost: number } | null } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [readinessData, setReadinessData] = useState<{ label: string, value: number }[]>([]);
+  const [isMentorshipActive, setIsMentorshipActive] = useState(false);
+  const [successScore, setSuccessScore] = useState(100);
 
   useEffect(() => {
     async function load() {
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user || { id: '00000000-0000-0000-0000-000000000000', email: 'demo@student.com' };
-      setUserEmail(user.email ?? '');
+      const userId = localStorage.getItem('demo_student_id');
+      if (!userId) {
+        router.push('/auth/login');
+        return;
+      }
 
-      const [appRes, skillRes, internRes] = await Promise.all([
-        supabase.from('application').select('*', { count: 'exact', head: true }).eq('student_id', user.id),
-        supabase.from('student_skill').select('*', { count: 'exact', head: true }).eq('student_id', user.id),
-        supabase.from('internship').select('*', { count: 'exact', head: true }),
-      ]);
+      try {
+        const response = await fetch(`/api/dashboard/stats?userId=${userId}`);
+        const data = await response.json();
 
-      setStats({
-        applications: appRes.count ?? 0,
-        skills: skillRes.count ?? 0,
-        matchedInternships: internRes.count ?? 0,
-      });
+        if (data.success) {
+          const student = data.student as Student;
+          setUserName(student.name);
+          setStats(data.stats);
+          setRecentApplications(data.recentApplications);
+          setMarketIntelligence({
+            marketReach: student.market_reach || 0,
+            highImpact: (student as any).high_impact_skill || null
+          });
 
-      const { data: apps } = await supabase
-        .from('application')
-        .select(`application_id, applied_date, status, internship:internship_id (title, company:company_id (company_name))`)
-        .eq('student_id', user.id)
-        .order('applied_date', { ascending: false })
-        .limit(5);
+          // Calculate Readiness Radar Data
+          const skills = student.skills.map(s => s.skill_name.toLowerCase());
+          const categories = [
+            { label: 'Frontend', keywords: ['react', 'next', 'tailwind', 'css', 'javascript', 'typescript', 'frontend'] },
+            { label: 'Backend', keywords: ['node', 'express', 'python', 'django', 'fastapi', 'backend', 'api'] },
+            { label: 'Data/AI', keywords: ['sql', 'postgres', 'mongodb', 'tensorflow', 'pytorch', 'ml', 'ai', 'data'] },
+            { label: 'DevOps', keywords: ['docker', 'kubernetes', 'aws', 'cicd', 'linux', 'cloud'] },
+            { label: 'Logic', keywords: ['dsa', 'algorithms', 'java', 'c++', 'rust', 'go'] }
+          ];
 
-      if (apps) setRecentApplications(apps as unknown as typeof recentApplications);
-      setLoading(false);
+          const readiness = categories.map(cat => ({
+            label: cat.label,
+            value: Math.min(100, Math.round((cat.keywords.filter(k => skills.some(s => s.includes(k))).length / 3) * 100) || 5) // Min 5 for radar shape
+          }));
+          setReadinessData(readiness);
+
+          // Completion Calculation
+          const checks = [
+            !!student.name,
+            !!student.college,
+            !!student.email,
+            data.stats.skills >= 3,
+            data.stats.applications > 0,
+          ];
+          setCompletionPct(Math.round((checks.filter(Boolean).length / checks.length) * 100));
+
+          // Sync AI Intelligence State
+          const mentorshipFlag = localStorage.getItem('ai_mentorship_active') === 'true';
+          setIsMentorshipActive(mentorshipFlag);
+          const prob = AI_ENGINE.calculateSuccessProbability(student.market_reach || 0, data.stats.applications);
+          setSuccessScore(prob);
+        } else {
+          setUserName('Professional');
+        }
+        setLoading(false);
+      } catch (e) {
+        console.error('Failed to load student dashboard:', e);
+        setLoading(false);
+      }
     }
     load();
-  }, [supabase]);
+  }, []);
+
+  const firstName = userName.split(' ')[0] || 'Professional';
+
+  // Radar Chart Helper
+  const RadarChart = ({ data }: { data: { label: string, value: number }[] }) => {
+    const size = 200;
+    const center = size / 2;
+    const radius = size * 0.4;
+    const angleStep = (Math.PI * 2) / data.length;
+
+    const points = data.map((d, i) => {
+      const angle = i * angleStep - Math.PI / 2;
+      const x = center + (radius * (d.value / 100)) * Math.cos(angle);
+      const y = center + (radius * (d.value / 100)) * Math.sin(angle);
+      return `${x},${y}`;
+    }).join(' ');
+
+    return (
+      <div className="relative size-[200px] flex items-center justify-center">
+        <svg viewBox={`0 0 ${size} ${size}`} className="size-full overflow-visible">
+          {/* Grid Background */}
+          {[0.2, 0.4, 0.6, 0.8, 1].map((r, i) => (
+            <circle key={i} cx={center} cy={center} r={radius * r} fill="none" stroke="currentColor" strokeWidth="0.5" className="text-slate-200" strokeDasharray="2 2" />
+          ))}
+          {/* Axis */}
+          {data.map((_, i) => {
+            const angle = i * angleStep - Math.PI / 2;
+            const x = center + radius * Math.cos(angle);
+            const y = center + radius * Math.sin(angle);
+            return <line key={i} x1={center} y1={center} x2={x} y2={y} stroke="currentColor" strokeWidth="0.5" className="text-slate-100" />;
+          })}
+          {/* Data Shape */}
+          <motion.polygon
+            points={points}
+            fill="currentColor"
+            fillOpacity="0.1"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="text-amber-500"
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1, delay: 0.5 }}
+          />
+          {/* Labels */}
+          {data.map((d, i) => {
+            const angle = i * angleStep - Math.PI / 2;
+            const x = center + (radius + 20) * Math.cos(angle);
+            const y = center + (radius + 20) * Math.sin(angle);
+            return (
+              <text key={i} x={x} y={y} textAnchor="middle" className="text-[10px] font-black fill-slate-400 uppercase tracking-tighter">
+                {d.label}
+              </text>
+            );
+          })}
+        </svg>
+      </div>
+    );
+  };
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        className="text-indigo-600"
+    <div className="flex flex-col items-center justify-center h-[70vh] gap-8">
+      <motion.div
+        animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.05, 1] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        className="size-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-lg"
       >
-        <Zap size={40} fill="currentColor" />
+        <Zap size={32} className="fill-amber-600" />
       </motion.div>
-      <p className="text-slate-500 font-medium animate-pulse">Customizing your experience...</p>
+      <div className="text-center space-y-2">
+        <h2 className="text-[10px] font-black uppercase tracking-[10px] text-amber-600">Loading Dashboard</h2>
+        <p className="text-slate-400 text-[9px] font-bold uppercase tracking-[4px] animate-pulse">Syncing your career intelligence...</p>
+      </div>
     </div>
   );
 
-  const statItems = [
-    { label: 'Applications', value: stats.applications, icon: ClipboardList, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'Skills Mastered', value: stats.skills, icon: Zap, color: 'text-cyan-600', bg: 'bg-cyan-50' },
-    { label: 'Open Opportunities', value: stats.matchedInternships, icon: Briefcase, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  ];
+  const successRate = stats.applications > 0 ? Math.round((stats.accepted / stats.applications) * 100) : 0;
+  const completionColor = completionPct >= 85 ? 'text-emerald-600' : completionPct >= 60 ? 'text-amber-600' : 'text-red-500';
+  const completionBar = completionPct >= 85 ? 'bg-emerald-500' : completionPct >= 60 ? 'bg-amber-500' : 'bg-red-400';
 
   return (
-    <div className="space-y-10">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <h1 className="text-3xl font-display font-bold text-slate-900 tracking-tight">
-            Welcome back, <span className="text-indigo-600">Scholar!</span> 👋
-          </h1>
-          <div className="flex items-center gap-2 mt-1 text-slate-500">
-            <UserCircle size={16} />
-            <span className="text-sm font-medium">{userEmail}</span>
+    <div className="space-y-12 pb-24 max-w-6xl mx-auto">
+
+      {/* Hero Welcome */}
+      <div className="relative bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden p-8 md:p-12">
+        <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 via-transparent to-indigo-50/30 pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div className="flex-1 flex flex-col lg:flex-row lg:items-center gap-12">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-[5px] text-slate-400">Career Intelligence • Live</span>
+              </div>
+              <h1 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight uppercase leading-[0.9] mb-4">
+                Hello,<br />
+                <span className="text-amber-600">{firstName}.</span>
+              </h1>
+              
+              {/* AI Skill Evolution Predictor Widget */}
+              {marketIntelligence && (
+                <ThreeDCard className="max-w-md mt-8">
+                  <div className="p-6 rounded-2xl bg-slate-950 text-white border border-white/5 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
+                      <TrendingUp size={60} className="text-amber-400" />
+                    </div>
+                    <div className="relative z-10 space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={14} className="text-amber-400" />
+                        <span className="text-[9px] font-black uppercase tracking-[3px] text-amber-400">Skill Evolution Predictor</span>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-black tracking-tighter text-white">{marketIntelligence.marketReach}%</div>
+                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Market Reach Potential</div>
+                      </div>
+                      {marketIntelligence.highImpact && (
+                        <div className="pt-4 border-t border-white/10">
+                          <p className="text-[10px] font-medium text-slate-400 leading-relaxed capitalize">
+                            Adding <span className="text-white font-black">{marketIntelligence.highImpact.name}</span> will increase your interview match rate by <span className="text-emerald-400">+{marketIntelligence.highImpact.boost}%</span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </ThreeDCard>
+              )}
+            </div>
+
+            {/* Technical Readiness Radar */}
+            <ThreeDCard>
+              <div className="shrink-0 p-8 rounded-[2.5rem] bg-slate-50 border border-slate-100 flex flex-col items-center justify-center gap-6 relative group overflow-hidden">
+                  <div className="absolute top-4 left-4">
+                     <div className="flex items-center gap-2">
+                        <Cpu size={12} className="text-amber-500" />
+                        <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-400">Readiness Radar</span>
+                     </div>
+                  </div>
+                  {readinessData.length > 0 && <RadarChart data={readinessData} />}
+              </div>
+            </ThreeDCard>
           </div>
-        </motion.div>
-        
-        <motion.div
-           initial={{ opacity: 0, scale: 0.95 }}
-           animate={{ opacity: 1, scale: 1 }}
-        >
-          <Button className="gap-2 shadow-lg shadow-indigo-100 h-12 px-6 rounded-2xl">
-            <Zap size={18} fill="currentColor" />
-            Launch AI Engine
-          </Button>
-        </motion.div>
+
+          <div className="flex flex-col gap-3 min-w-[200px]">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-black uppercase tracking-[3px] text-slate-400">Profile Strength</span>
+              <span className={`text-xl font-black tracking-tighter ${completionColor}`}>{completionPct}%</span>
+            </div>
+            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }} animate={{ width: `${completionPct}%` }}
+                  className={`h-full rounded-full ${completionBar}`}
+                />
+            </div>
+            <Link href="/dashboard/internships">
+              <motion.button
+                whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                className="w-full mt-2 bg-amber-600 hover:bg-amber-700 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-[4px] shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2 transition-colors"
+              >
+                <Zap size={14} className="fill-white" />
+                Browse Market Roles
+              </motion.button>
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-        {statItems.map((item, index) => (
-          <Card key={item.label} transition={{ delay: index * 0.1 }} className="group hover:shadow-xl hover:border-indigo-100 transition-all duration-300 relative border-none shadow-md bg-white">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-bl-full opacity-50 transition-all group-hover:bg-indigo-50" />
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <div className={`p-3 rounded-2xl ${item.bg} ${item.color}`}>
-                <item.icon size={22} />
+      {/* 2025 Modern Tech Roadmap */}
+      <section className="space-y-6">
+         <div className="flex items-center justify-between">
+            <div className="space-y-1">
+               <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">2025 Industrial Tech Spectrum</h2>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-[3px]">Predictive Roadmap by SkillSync AI</p>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600">
+               <Globe size={14} />
+               <span className="text-[9px] font-black uppercase tracking-widest">Global Standards</span>
+            </div>
+         </div>
+         
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {AI_ENGINE.getModernFrontendStack().map((tech, i) => (
+              <ThreeDCard key={tech.name}>
+                <div className="p-6 rounded-[2rem] bg-white border border-slate-100 shadow-sm hover:border-amber-500/50 transition-all flex flex-col gap-4 h-full relative overflow-hidden group">
+                   <div className="absolute -top-4 -right-4 size-20 bg-slate-50 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                   <div className="flex justify-between items-start">
+                      <div className="size-8 rounded-lg bg-slate-950 text-white flex items-center justify-center shadow-lg">
+                         <Code size={14} />
+                      </div>
+                      <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">{tech.impact}% Match</span>
+                   </div>
+                   <div>
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-tight mb-1">{tech.name}</h4>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-[2px]">{tech.category}</p>
+                   </div>
+                </div>
+              </ThreeDCard>
+            ))}
+         </div>
+      </section>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Applications', value: stats.applications, icon: ClipboardList, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+          { label: 'Skills Added', value: stats.skills, icon: Award, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+          { label: 'Open Market Roles', value: stats.internships, icon: Briefcase, color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-100' },
+          { label: 'Growth Score', value: `${marketIntelligence?.marketReach || 0}%`, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+        ].map((stat, i) => (
+          <div key={stat.label} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[9px] font-black uppercase tracking-[2px] text-slate-400">{stat.label}</span>
+              <div className={`size-8 rounded-lg ${stat.bg} flex items-center justify-center ${stat.color}`}>
+                <stat.icon size={14} />
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-display font-black text-slate-900 mb-1">{item.value}</div>
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider">{item.label}</p>
-            </CardContent>
-          </Card>
+            </div>
+            <div className={`text-3xl font-black tracking-tighter ${stat.color}`}>{stat.value}</div>
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Quick Actions */}
-        <div className="space-y-6">
-          <h2 className="text-xl font-display font-bold text-slate-800 flex items-center gap-2.5">
-            <SparklesIcon size={20} className="text-amber-500" />
-            Recommended Actions
-          </h2>
-          <div className="grid gap-4">
-             <ActionCard 
-               href="/dashboard/internships" 
-               title="Matched Internships" 
-               desc="Explore 12 new roles matching your profile." 
-               icon={Briefcase} 
-               color="indigo" 
-               delay={0.1}
-             />
-             <ActionCard 
-               href="/dashboard/skills" 
-               title="Analyze Skills" 
-               desc="Find out which skills are trending in the market." 
-               icon={Zap} 
-               color="cyan" 
-               delay={0.2}
-             />
-             <ActionCard 
-               href="/dashboard/profile" 
-               title="Enhance Profile" 
-               desc="Your profile is 85% complete. Reach 100%!" 
-               icon={UserCircle} 
-               color="emerald" 
-               delay={0.3}
-             />
+      {/* AI Mentorship Hub - Reactive based on Predictive Performance */}
+      {(isMentorshipActive || successScore < 40) && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="p-8 rounded-[3rem] bg-rose-50 border border-rose-100 relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:scale-110 transition-transform">
+            <Zap size={100} className="text-rose-500" />
           </div>
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+            <div className="size-16 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/20 shrink-0">
+               <ShieldCheck size={32} />
+            </div>
+            <div className="flex-1 space-y-2">
+               <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-rose-500 uppercase tracking-[4px]">AI Mentorship Activated</span>
+                  <div className="h-px w-12 bg-rose-200" />
+               </div>
+               <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Strategic Career Pivot Required</h3>
+               <p className="text-sm font-medium text-slate-500 leading-relaxed max-w-2xl">
+                 Based on current industrial demand and your match matrix, we recommend a rapid sprint in <span className="text-rose-600 font-black italic">Server-Side Architectures</span>. {isMentorshipActive ? "An administrator has flagged your profile for expert-AI guidance." : `Your current success probability is ${successScore}% (Lower Than Optimal).`}
+               </p>
+            </div>
+            <div className="flex flex-col gap-2">
+               <Link href="/dashboard/skills">
+                  <button className="px-8 py-4 rounded-2xl bg-rose-600 text-white font-black text-[10px] uppercase tracking-[3px] shadow-xl shadow-rose-600/20 hover:bg-rose-700 transition-all w-full">
+                    Begin AI Corrective Sprint
+                  </button>
+               </Link>
+               {isMentorshipActive && (
+                  <button 
+                    onClick={() => { localStorage.removeItem('ai_mentorship_active'); setIsMentorshipActive(false); }}
+                    className="text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600"
+                  >
+                    Mark as Resolved
+                  </button>
+               )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-8">
+        <div className="xl:col-span-2 space-y-6">
+           <div className="p-8 rounded-[2.5rem] bg-indigo-50 border border-indigo-100">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="size-9 rounded-xl bg-white border border-indigo-200 flex items-center justify-center text-indigo-600">
+                  <Target size={16} />
+                </div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Growth Roadmap</h3>
+              </div>
+              <div className="space-y-4">
+                <div className="p-4 bg-white rounded-2xl border border-indigo-100">
+                  <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest block mb-2">Next Best Skill</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-slate-900 text-lg uppercase tracking-tight">{marketIntelligence?.highImpact?.name || 'Loading...'}</span>
+                    <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md">+{marketIntelligence?.highImpact?.boost}% Match</span>
+                  </div>
+                </div>
+                <Link href="/dashboard/skills">
+                  <button className="w-full py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-[3px] hover:bg-slate-800 transition-colors">
+                    Update Skill Inventory
+                  </button>
+                </Link>
+              </div>
+           </div>
         </div>
 
-        {/* Recent Applications */}
-        <div className="space-y-6">
+        <div className="xl:col-span-3 space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-display font-bold text-slate-800 flex items-center gap-2.5">
-              <Clock size={20} className="text-indigo-500" />
-              Application Tracker
-            </h2>
-            <Link href="/dashboard/applications" className="text-sm font-semibold text-indigo-600 hover:underline">View All</Link>
+            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Active Application Feed</h3>
+            <Link href="/dashboard/applications" className="text-[9px] font-black text-amber-600 uppercase tracking-[3px] hover:underline">View All</Link>
           </div>
-          
-          <Card className="border-none shadow-md overflow-hidden bg-white/50 backdrop-blur-sm">
-            <CardContent className="p-0">
-              {recentApplications.length === 0 ? (
-                <div className="p-10 text-center space-y-3">
-                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-300">
-                    <ClipboardList size={30} />
-                  </div>
-                  <p className="text-slate-500 text-sm font-medium">No active applications. Start your journey today!</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {recentApplications.map((app, index) => {
-                    const config = statusConfig[app.status] || { color: 'secondary', icon: Clock };
-                    return (
-                      <motion.div 
-                        key={app.application_id}
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 + index * 0.05 }}
-                        className="p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors cursor-pointer group"
+          <div className="space-y-3">
+            {recentApplications.map((app, i) => {
+              const cfg = statusConfig[app.status] || statusConfig['Pending'];
+              const Icon = cfg.icon;
+              return (
+                <div key={app.application_id} className="p-5 bg-white border border-slate-100 rounded-2xl flex items-center gap-5 hover:shadow-md transition-all">
+                    <div className={`size-11 rounded-xl ${cfg.bg} border ${cfg.border} flex items-center justify-center ${cfg.color} shrink-0`}>
+                      <Icon size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-black text-slate-900 truncate">{app.role_title || 'Role'}</h4>
+                      <p className="text-[10px] font-bold text-slate-400">{app.company_name || 'Organization'}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-xl border text-[9px] font-black uppercase tracking-widest ${cfg.bg} ${cfg.border} ${cfg.color}`}>
+                      {app.status}
+                    </span>
+                    <Link href={`/dashboard/interview/${app.application_id}`}>
+                      <motion.button 
+                        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        className="p-3 rounded-xl bg-slate-900 text-white hover:bg-amber-600 transition-colors shadow-sm"
+                        title="Start AI Practice Interview"
                       >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
-                            app.status === 'Accepted' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'
-                          }`}>
-                            <Briefcase size={18} />
-                          </div>
-                          <div>
-                            <div className="text-sm font-bold text-slate-800">{app.internship?.title ?? 'Position Unavailable'}</div>
-                            <div className="text-xs font-medium text-slate-500">{app.internship?.company?.company_name ?? 'Confidential'}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                           <Badge variant={config.color} className="gap-1 px-2.5 py-1">
-                             <config.icon size={12} />
-                             {app.status}
-                           </Badge>
-                           <ArrowRight size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                        <Play size={14} className="fill-white" />
+                      </motion.button>
+                    </Link>
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function ActionCard({ href, title, desc, icon: Icon, color, delay }: any) {
-  const colors: any = {
-    indigo: "bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100",
-    cyan: "bg-cyan-50 text-cyan-600 border-cyan-100 hover:bg-cyan-100",
-    emerald: "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100",
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay }}
-    >
-      <Link href={href} className="no-underline block">
-        <div className={`p-4 rounded-2xl border transition-all duration-300 flex items-center gap-4 shadow-sm hover:shadow-md ${colors[color]}`}>
-          <div className="bg-white p-2.5 rounded-xl shadow-sm">
-            <Icon size={20} />
-          </div>
-          <div className="flex-1">
-            <div className="text-sm font-bold tracking-tight">{title}</div>
-            <p className="text-xs font-medium opacity-80">{desc}</p>
-          </div>
-          <ArrowRight size={16} />
-        </div>
-      </Link>
-    </motion.div>
-  );
-}

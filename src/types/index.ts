@@ -1,61 +1,63 @@
-export type UserRole = 'student' | 'company' | 'admin';
-
-export interface Student {
-  student_id: string;
-  name: string;
-  email: string;
-  college: string | null;
-  branch: string | null;
-  graduation_year: number | null;
-  resume_url: string | null;
-}
-
-export interface Company {
-  company_id: string;
-  company_name: string;
-  email: string;
-  industry: string | null;
-  location: string | null;
-}
-
-export interface Admin {
-  admin_id: string;
-  username: string;
-  email: string;
-}
-
 export interface Skill {
-  skill_id: number;
   skill_name: string;
-  category: string | null;
-}
-
-export interface StudentSkill {
-  student_id: string;
-  skill_id: number;
-  proficiency_level: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
-  skill?: Skill;
+  level?: string;
 }
 
 export interface Internship {
-  internship_id: number;
+  id: string;
   company_id: string;
+  company_name: string;
   title: string;
-  description: string | null;
-  duration: string | null;
-  stipend: string | null;
-  location: string | null;
-  company?: Company;
-  required_skills?: Skill[];
-  match_percentage?: number;
+  description: string;
+  requirements: {
+    role_skills: string[];
+    experience_level: string;
+  };
+  duration: string;
+  stipend: string;
+  location: string;
+  status: 'Open' | 'Closed';
 }
 
 export interface Application {
-  application_id: number;
+  application_id: string;
   student_id: string;
-  internship_id: number;
-  applied_date: string;
+  internship_id: string;
+  company_id: string;
   status: 'Pending' | 'Under Review' | 'Interviewing' | 'Accepted' | 'Rejected';
-  internship?: Internship;
-  student?: Student;
+  applied_date: string;
+  // Enriched fields
+  student_name?: string;
+  role_title?: string;
+  company_name?: string;
+  match_score?: number;
+  ai_interview_guide?: string[];
+}
+
+export interface Student {
+  id: string;
+  name: string;
+  email: string;
+  college: string;
+  skills: Skill[];
+  market_reach?: number;
+  high_impact_skill?: {
+    name: string;
+    boost: number;
+  };
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  industry: string;
+  location: string;
+  description: string;
+}
+
+export interface MarketEquilibriumItem {
+  name: string;
+  supply: number;
+  demand: number;
+  gap: number;
 }

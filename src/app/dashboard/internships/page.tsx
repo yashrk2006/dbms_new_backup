@@ -1,299 +1,473 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
-  Search, 
-  MapPin, 
-  Calendar, 
-  DollarSign, 
-  Target,
-  ArrowRight,
-  Briefcase,
-  CheckCircle2,
-  Filter,
-  Layers,
-  Sparkles
+  Search, Calendar, DollarSign, Target, ShieldCheck, Activity, 
+  Cpu, Zap, Globe, Database, Terminal, Lightbulb, Sparkles 
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
+import AnimatedSection from '@/components/ui/AnimatedSection';
+import { toast } from 'react-hot-toast';
+import { AI_ENGINE } from '@/lib/ai-engine';
 
 interface Internship {
+  id: string;
   internship_id: number;
   title: string;
-  description: string | null;
-  duration: string | null;
-  stipend: string | null;
-  location: string | null;
-  company: { company_name: string } | null;
-  required_skills: Array<{ skill_id: number; skill_name: string }>;
+  company_name: string;
+  description: string;
+  duration: string;
+  stipend: string;
+  location: string;
+  company_id: string;
+  required_skills: string[];
+  missing_skills: string[];
   match_percentage: number;
   applied: boolean;
+  success_probability?: number;
+  match_diagnosis?: {
+    matched: string[];
+    missing: string[];
+    scarcity: { name: string, is_rare: boolean }[];
+  };
 }
 
 export default function InternshipsPage() {
-  const supabase = createClient();
+  const router = useRouter();
   const [internships, setInternships] = useState<Internship[]>([]);
   const [loading, setLoading] = useState(true);
-  const [applying, setApplying] = useState<number | null>(null);
+  const [applying, setApplying] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [mySkills, setMySkills] = useState<string[]>([]);
+  const [now, setNow] = useState<number>(0);
+  const [aiInterviewModal, setAiInterviewModal] = useState<{ open: boolean; title: string; questions: string[] }>({
+    open: false,
+    title: '',
+    questions: []
+  });
 
   const load = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user || { id: '00000000-0000-0000-0000-000000000000', email: 'demo@student.com' };
+    setLoading(true);
+    setNow(Date.now());
+    const storedUserId = localStorage.getItem('demo_student_id');
+    if (!storedUserId) {
+      router.push('/auth/login');
+      return;
+    }
+    
+    try {
+      const respStats = await fetch(`/api/dashboard/stats?userId=${storedUserId}`);
+      const statsResult = await respStats.json();
+      const currentSkills = statsResult.success ? statsResult.student.skills.map((s: any) => s.skill_name) : [];
+      setMySkills(currentSkills);
 
-    const { data: studentSkills } = await supabase
-      .from('student_skill').select('skill_id').eq('student_id', user.id);
-    const mySkillIds = new Set((studentSkills ?? []).map((s: { skill_id: number }) => s.skill_id));
+      const respInternships = await fetch(`/api/internships?userId=${storedUserId}`);
+      const internshipsResult = await respInternships.json();
+      
+      if (internshipsResult.success) {
+        const mapped: Internship[] = internshipsResult.data.map((i: any) => {
+          const requirements = i.requirements?.role_skills || [];
+          const matched = requirements.filter((s: string) => currentSkills.includes(s)).length;
+          const matchPercent = requirements.length > 0 ? Math.round((matched / requirements.length) * 100) : 0;
+          
+          const diagnosis = AI_ENGINE.getMatchDiagnosis(currentSkills, requirements);
+          const probability = AI_ENGINE.calculateSuccessProbability(matchPercent, i.application?.[0]?.count || 0);
 
-    const { data: internshipsData } = await supabase
-      .from('internship')
-      .select(`internship_id, title, description, duration, stipend, location,
-        company:company_id (company_name),
-        required_skills:internship_requirements (skill_id, skill:skill_id (skill_name))`);
-
-    const { data: appsData } = await supabase
-      .from('application').select('internship_id').eq('student_id', user.id);
-    const appliedIds = new Set((appsData ?? []).map((a: { internship_id: number }) => a.internship_id));
-
-    const mapped: Internship[] = ((internshipsData ?? []) as any[]).map((i) => {
-      const companyRaw = Array.isArray(i.company) ? i.company[0] : i.company;
-      const reqSkills = ((i.required_skills ?? []) as any[]).map((rs: any) => ({
-        skill_id: rs.skill_id,
-        skill_name: (Array.isArray(rs.skill) ? rs.skill[0]?.skill_name : rs.skill?.skill_name) ?? '',
-      }));
-      const matched = reqSkills.filter((rs: { skill_id: number }) => mySkillIds.has(rs.skill_id)).length;
-      const match_percentage = reqSkills.length > 0 ? Math.round((matched / reqSkills.length) * 100) : 0;
-      return {
-        internship_id: i.internship_id,
-        title: i.title,
-        description: i.description,
-        duration: i.duration,
-        stipend: i.stipend,
-        location: i.location,
-        company: companyRaw ?? null,
-        required_skills: reqSkills,
-        match_percentage,
-        applied: appliedIds.has(i.internship_id),
-      };
-    }).sort((a: Internship, b: Internship) => b.match_percentage - a.match_percentage);
-
-    setInternships(mapped);
-    setLoading(false);
-  }, [supabase]);
+          return {
+            id: i.id,
+            internship_id: i.internship_id,
+            title: i.title,
+            company_name: i.company_name,
+            description: i.description,
+            duration: i.duration,
+            stipend: i.stipend,
+            location: i.location,
+            company_id: i.company_id,
+            required_skills: requirements,
+            missing_skills: diagnosis.missing,
+            match_percentage: matchPercent,
+            applied: i.applied,
+            success_probability: probability,
+            match_diagnosis: diagnosis
+          };
+        }).sort((a: Internship, b: Internship) => b.match_percentage - a.match_percentage);
+        
+        setInternships(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to load internships:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
   useEffect(() => { load(); }, [load]);
 
-  async function handleApply(internship_id: number) {
-    setApplying(internship_id);
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user || { id: '00000000-0000-0000-0000-000000000000', email: 'demo@student.com' };
-    await supabase.from('application').insert({ student_id: user.id, internship_id });
-    await load();
-    setApplying(null);
+  const handleInterviewPrep = (internship: Internship) => {
+    const questions = AI_ENGINE.generateInterviewQuestions(mySkills, internship.title);
+    setAiInterviewModal({
+      open: true,
+      title: internship.title,
+      questions
+    });
+    toast.success('AI Interview Simulator active.', { icon: '🤖' });
+  };
+
+  // Skill Evolution Predictor Logic
+  const evolutionData = useMemo(() => {
+    if (internships.length === 0) return [];
+    const skillMarketPresence: Record<string, number> = {};
+    internships.forEach(i => {
+      i.missing_skills.forEach(skill => {
+        skillMarketPresence[skill] = (skillMarketPresence[skill] || 0) + 1;
+      });
+    });
+
+    return Object.entries(skillMarketPresence)
+      .map(([name, count]) => ({
+        name,
+        impact: Math.round((count / internships.length) * 100),
+        count
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+  }, [internships]);
+
+  async function handleApply(internship: Internship) {
+    if (applying || internship.applied) return;
+    
+    setApplying(internship.id);
+    const userId = localStorage.getItem('demo_student_id');
+    if (!userId) {
+      toast.error('Session expired. Please login again.');
+      router.push('/auth/login');
+      return;
+    }
+
+    const toastId = toast.loading(`Syndicating application for ${internship.title}...`);
+
+    try {
+      const response = await fetch('/api/applications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: userId,
+          internship_id: internship.internship_id
+        })
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success(`Application successful! Match Score: ${internship.match_percentage}%`, { id: toastId });
+        await load();
+      } else {
+        toast.error(result.error || 'Failed to syndicate application.', { id: toastId });
+      }
+    } catch (e) {
+      console.error('Apply error:', e);
+      toast.error('Intelligence sync failed. Please try again.', { id: toastId });
+    } finally {
+      setApplying(null);
+    }
   }
 
   const filtered = internships.filter(i =>
     i.title.toLowerCase().includes(search.toLowerCase()) ||
-    (i.company?.company_name ?? '').toLowerCase().includes(search.toLowerCase())
+    (i.company_name || '').toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-      <motion.div 
-        animate={{ y: [0, -10, 0] }}
-        transition={{ duration: 1.5, repeat: Infinity }}
-        className="text-indigo-600"
-      >
-        <Briefcase size={40} fill="currentColor" />
+    <div className="flex flex-col items-center justify-center h-[70vh] gap-10">
+      <motion.div animate={{ rotate: 360, scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }} className="text-amber-600">
+        <Globe size={80} className="fill-amber-600/10" />
       </motion.div>
-      <p className="text-slate-500 font-medium font-display animate-pulse">Matching opportunities with your profile...</p>
+      <div className="text-center">
+         <h2 className="text-xs font-black uppercase tracking-[12px] text-amber-600 mb-4">Exploring Opportunities</h2>
+         <p className="text-slate-500 text-[10px] font-black uppercase tracking-[6px] animate-pulse">Analyzing Skill Match & Market Compatibility</p>
+      </div>
     </div>
   );
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold mb-3 uppercase tracking-wider">
-            <Sparkles size={14} fill="currentColor" />
-            AI-Powered Matching
+    <div className="space-y-16 pb-24">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-12 pb-12 border-b border-slate-200">
+        <AnimatedSection direction="up" distance={40}>
+          <div className="flex items-center gap-4 mb-6">
+             <div className="size-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                <Target size={18} className="animate-pulse" />
+             </div>
+             <h2 className="text-[10px] font-black uppercase tracking-[8px] text-slate-500">Career Portal — Internship Search</h2>
           </div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 tracking-tight">Opportunity Hub</h1>
-          <p className="text-slate-500 font-medium max-w-md mt-1">Discover internships custom-tailored to your unique skill set.</p>
-        </motion.div>
-
-        <div className="relative w-full md:w-80 group">
+          <h1 className="text-5xl md:text-7xl font-black text-slate-950 tracking-tight uppercase leading-[0.9] mb-6">
+            Internship<br />
+            <span className="text-amber-600">Listings.</span>
+          </h1>
+          <div className="flex items-center gap-3 text-slate-400">
+             <div className="size-1.5 rounded-full bg-amber-500/30" />
+             <span className="text-[10px] font-bold uppercase tracking-[3px]">Real-time synchronization with active career opportunities</span>
+          </div>
+        </AnimatedSection>
+        
+        <AnimatedSection direction="up" className="relative w-full lg:w-[450px] group" delay={0.2}>
+          <div className="absolute inset-0 bg-amber-500/5 blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
           <input
             id="internship-search"
             type="text"
-            placeholder="Search roles or companies..."
+            placeholder="SEARCH BY ROLE OR COMPANY..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full h-12 pl-11 pr-4 rounded-2xl border-slate-200 bg-white shadow-sm focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-sm group-hover:border-indigo-300"
+            className="w-full h-20 pl-16 pr-8 rounded-3xl border border-slate-200 bg-white text-[12px] font-black uppercase tracking-[3px] text-slate-900 placeholder:text-slate-300 transition-all focus:border-amber-500/30 focus:shadow-lg focus:shadow-amber-500/5 shadow-sm"
           />
-          <Search size={18} className="absolute left-4 top-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-        </div>
+          <Search size={22} className="absolute left-6 top-7 text-slate-300 group-focus-within:text-amber-500 transition-colors" />
+        </AnimatedSection>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        <AnimatePresence mode="popLayout">
-          {filtered.map((i, index) => (
-            <motion.div
-              key={i.internship_id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              layout
-            >
-              <Card className="group hover:shadow-2xl hover:border-indigo-100 transition-all duration-500 border-none shadow-md bg-white overflow-hidden">
-                <div className="flex flex-col lg:flex-row lg:items-center">
-                  {/* Matching Side */}
-                  <div className={cn(
-                    "lg:w-48 p-8 flex flex-col items-center justify-center gap-3 text-center border-b lg:border-b-0 lg:border-r border-slate-100 transition-colors group-hover:bg-slate-50/50",
-                    i.match_percentage >= 80 ? "bg-emerald-50/30" : i.match_percentage >= 50 ? "bg-amber-50/30" : "bg-slate-50/30"
-                  )}>
-                    <div className="relative">
-                      <svg className="w-16 h-16 transform -rotate-90">
-                        <circle
-                          cx="32"
-                          cy="32"
-                          r="28"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="transparent"
-                          className="text-slate-100"
-                        />
-                        <motion.circle
-                          cx="32"
-                          cy="32"
-                          r="28"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          fill="transparent"
-                          strokeDasharray={175.9}
-                          initial={{ strokeDashoffset: 175.9 }}
-                          animate={{ strokeDashoffset: 175.9 - (175.9 * i.match_percentage) / 100 }}
-                          transition={{ duration: 1, delay: 0.5 }}
-                          className={cn(
-                             i.match_percentage >= 80 ? "text-emerald-500" : i.match_percentage >= 50 ? "text-amber-500" : "text-indigo-400"
-                          )}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center font-display font-black text-slate-800 text-sm">
-                        {i.match_percentage}%
-                      </div>
+      {evolutionData.length > 0 && (
+        <AnimatedSection direction="up" delay={0.3}>
+          <div className="bg-slate-950 rounded-[3rem] p-10 relative overflow-hidden group/evolution border border-white/5">
+            <div className="absolute top-0 right-0 p-12 opacity-10 group-hover/evolution:scale-110 transition-transform duration-700">
+              <Activity size={120} className="text-amber-500" />
+            </div>
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+              <div className="lg:col-span-5 space-y-6">
+                <div className="flex items-center gap-3">
+                  <div className="size-8 rounded-xl bg-amber-500 text-black flex items-center justify-center">
+                    <Zap size={16} fill="currentColor" />
+                  </div>
+                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-[5px]">Predictive Analytics</span>
+                </div>
+                <h3 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">Skill Evolution<br />Predictor.</h3>
+                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-[2px] leading-relaxed">
+                  Our AI has analyzed the current market. Acquiring these top missing skills will maximize your matching probability across all active listings.
+                </p>
+              </div>
+              <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-3 gap-4">
+                {evolutionData.map((skill, idx) => (
+                  <div key={skill.name} className="bg-white/5 border border-white/10 p-6 rounded-[2rem] hover:bg-white/10 transition-all group/item">
+                    <div className="flex justify-between items-start mb-4">
+                      <span className="text-[9px] font-black text-amber-500 uppercase tracking-[2px]">High Impact</span>
+                      <span className="text-[10px] font-black text-white/20">0{idx+1}</span>
                     </div>
-                    <div className="space-y-0.5">
-                       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Match Score</p>
-                       <p className={cn(
-                         "text-xs font-bold",
-                         i.match_percentage >= 80 ? "text-emerald-600" : i.match_percentage >= 50 ? "text-amber-600" : "text-indigo-600"
-                       )}>
-                         {i.match_percentage >= 80 ? 'Highly Recommended' : i.match_percentage >= 50 ? 'Strong Potential' : 'New Challenge'}
-                       </p>
+                    <div className="text-lg font-black text-white uppercase tracking-tighter mb-1">{skill.name}</div>
+                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-[2px] mb-6">+{skill.impact}% Market Reach</div>
+                    <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                      <motion.div initial={{ width: 0 }} whileInView={{ width: `${skill.impact}%` }} transition={{ duration: 1, delay: 0.5 + (idx * 0.1) }} className="h-full bg-amber-500" />
                     </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </AnimatedSection>
+      )}
 
-                  {/* Content Side */}
-                  <div className="flex-1 p-6 lg:p-8">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <h3 className="text-xl font-display font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{i.title}</h3>
-                          {i.applied && (
-                            <Badge variant="success" className="gap-1 animate-in fade-in zoom-in duration-300">
-                              <CheckCircle2 size={12} />
-                              Applied
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm font-semibold text-slate-500">
-                          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 rounded-lg group-hover:bg-white transition-colors">
-                            <Briefcase size={15} className="text-indigo-500" />
-                            {i.company?.company_name}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <MapPin size={15} className="text-slate-400" />
-                            {i.location ?? 'Remote'}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Calendar size={15} className="text-slate-400" />
-                            {i.duration ?? 'Flexible Duration'}
-                          </div>
-                          {i.stipend && (
-                            <div className="flex items-center gap-1.5 text-emerald-600">
-                              <DollarSign size={15} />
-                              {i.stipend}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex sm:flex-col items-center sm:items-end gap-3 shrink-0">
-                         <Button
-                          id={`apply-btn-${i.internship_id}`}
-                          onClick={() => handleApply(i.internship_id)}
-                          disabled={i.applied || applying === i.internship_id}
-                          variant={i.applied ? 'outline' : 'primary'}
-                          className={cn(
-                            "h-11 px-8 rounded-xl font-bold transition-all shadow-lg",
-                            !i.applied && "shadow-indigo-100 hover:shadow-indigo-200"
-                          )}
-                        >
-                          {applying === i.internship_id ? (
-                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Target size={18} /></motion.div>
-                          ) : i.applied ? (
-                             'View Status'
-                          ) : (
-                            'Apply Now'
-                          )}
-                        </Button>
-                      </div>
+      <div className="space-y-12">
+        <AnimatePresence mode="popLayout">
+          {filtered.map((i, index) => {
+            const isTopMatch = i.match_percentage >= 80;
+            return (
+              <AnimatedSection key={i.id} delay={index * 0.05} direction="up">
+                <div className="group relative bg-white rounded-[2.5rem] border border-slate-100 hover:border-amber-200 transition-all duration-700 overflow-hidden flex flex-col lg:flex-row shadow-sm hover:shadow-xl">
+                  <div className={`lg:w-72 p-12 flex flex-col items-center justify-center gap-8 text-center transition-all duration-700 relative border-b lg:border-b-0 lg:border-r border-slate-100 ${
+                    i.match_percentage >= 80 ? "bg-amber-600/[0.03]" : i.match_percentage >= 50 ? "bg-amber-500/[0.03]" : "bg-slate-50"
+                  }`}>
+                    <div className="relative group/score">
+                       <svg className="size-32 transform -rotate-90">
+                         <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-slate-100" />
+                         <motion.circle
+                           cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="6" fill="transparent"
+                           strokeDasharray={364.4}
+                           initial={{ strokeDashoffset: 364.4 }}
+                           whileInView={{ strokeDashoffset: 364.4 - (364.4 * i.match_percentage) / 100 }}
+                           transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+                           className={i.match_percentage >= 80 ? "text-amber-600" : i.match_percentage >= 50 ? "text-amber-500" : "text-slate-300"}
+                         />
+                       </svg>
+                       <div className="absolute inset-0 flex flex-col items-center justify-center group-hover/score:scale-110 transition-transform duration-500">
+                         <span className="text-4xl font-black text-slate-900 tracking-tighter">{i.match_percentage}<span className="text-lg opacity-30">%</span></span>
+                         <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-400">Match</span>
+                       </div>
                     </div>
-
-                    <div className="mt-6 pt-6 border-t border-slate-50 relative">
-                       <p className="text-slate-600 text-sm leading-relaxed line-clamp-2 italic mb-4">
-                         &quot;{i.description}&quot;
-                       </p>
-
-                       <div className="flex flex-wrap items-center gap-2">
-                         <div className="p-1 px-2 rounded-lg bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1.5 mr-2">
-                            <Target size={10} /> REQUIRED SKILLS
-                         </div>
-                         {i.required_skills.map((rs) => (
-                           <Badge key={rs.skill_id} variant="secondary" className="px-2.5 py-1 bg-indigo-50/50 hover:bg-indigo-100/50 transition-colors border-none text-indigo-700 font-bold">
-                             {rs.skill_name}
-                           </Badge>
-                         ))}
+                    <div className="space-y-4">
+                       <div className="flex flex-col items-center gap-1">
+                          <span className="text-[10px] font-black uppercase tracking-[5px] text-slate-400">Selection Chance</span>
+                          <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[3px] border ${
+                             (i.success_probability || 0) >= 70 ? "bg-emerald-50 text-emerald-600 border-emerald-100" : (i.success_probability || 0) >= 40 ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-rose-50 text-rose-600 border-rose-100"
+                          }`}>
+                            {i.success_probability}% Probability
+                          </div>
+                       </div>
+                       <div className={`text-[10px] font-black uppercase tracking-[3px] px-5 py-2 rounded-2xl border border-slate-100 bg-white shadow-sm ${
+                         i.match_percentage >= 80 ? "text-amber-600" : i.match_percentage >= 50 ? "text-amber-500" : "text-slate-400"
+                       }`}>
+                         {i.match_percentage >= 80 ? 'Perfect Match' : i.match_percentage >= 50 ? 'High Alignment' : 'Profile Review'}
                        </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </AnimatePresence>
 
-        {filtered.length === 0 && (
-          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-200 space-y-4 shadow-sm">
-             <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-300">
-                <Search size={40} />
-             </div>
-             <div className="max-w-xs mx-auto">
-               <p className="text-slate-900 font-bold text-lg">No opportunities found</p>
-               <p className="text-sm text-slate-500">Try adjusting your search or enhancing your skills to see more matches.</p>
-             </div>
-             <Button variant="outline" onClick={() => setSearch('')} className="mt-2">Clear Search Filters</Button>
-          </div>
+                  <div className="flex-1 p-12 flex flex-col justify-between relative">
+                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-12 mb-12">
+                       <div className="space-y-6">
+                          <div className="flex flex-col gap-2">
+                              <div className="flex items-center gap-4">
+                                <h3 className="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter group-hover:text-amber-600 transition-colors leading-[0.8]">
+                                    {i.title}
+                                </h3>
+                                {i.applied && (
+                                    <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 shadow-sm">
+                                        <ShieldCheck size={14} className="animate-pulse" />
+                                        <span className="text-[10px] font-black uppercase tracking-[3px]">Applied</span>
+                                    </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                  <div className="size-1.5 rounded-full bg-amber-500/30" />
+                                  <span className="text-[11px] font-bold uppercase tracking-[3px] text-slate-400">{i.company_name}</span>
+                              </div>
+                          </div>
+                          <div className="flex flex-wrap gap-x-10 gap-y-6">
+                             <div className="flex items-center gap-4 group/item">
+                                <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><Globe size={16} /></div>
+                                <div className="flex flex-col">
+                                   <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Location</span>
+                                   <span className="text-[11px] font-black text-slate-500 uppercase tracking-[2px]">{i.location}</span>
+                                </div>
+                             </div>
+                             <div className="flex items-center gap-4 group/item">
+                                <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><Calendar size={16} /></div>
+                                <div className="flex flex-col">
+                                   <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Duration</span>
+                                   <span className="text-[11px] font-black text-slate-500 uppercase tracking-[2px]">{i.duration}</span>
+                                </div>
+                             </div>
+                             <div className="flex items-center gap-4 group/item">
+                                <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><DollarSign size={16} /></div>
+                                <div className="flex flex-col">
+                                   <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Stipend</span>
+                                   <span className="text-[11px] font-black text-amber-600 uppercase tracking-[2px]">{i.stipend}</span>
+                                </div>
+                             </div>
+                          </div>
+                          <div className="flex gap-3">
+                              <button
+                                onClick={() => handleInterviewPrep(i)}
+                                className="px-6 py-3 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-[3px] flex items-center gap-2 hover:bg-indigo-100 transition-all shadow-sm"
+                              >
+                                <Sparkles size={14} />
+                                Interview Prep
+                              </button>
+                           </div>
+                       </div>
+                       <motion.button
+                         whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(217,119,6,0.15)" }} whileTap={{ scale: 0.95 }}
+                         onClick={() => handleApply(i)}
+                         disabled={i.applied || applying === i.id}
+                         className={`px-12 py-6 rounded-2xl text-[11px] font-black uppercase tracking-[5px] shadow-lg transition-all relative overflow-hidden group/btn border border-slate-200 flex items-center gap-5 ${
+                           i.applied ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-amber-600 text-white hover:bg-amber-500 border-amber-500"
+                         }`}
+                       >
+                          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+                          {applying === i.id ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2 }}><Cpu size={20} /></motion.div> : i.applied ? <ShieldCheck size={20} /> : <Zap size={20} className="fill-white" />}
+                          <span className="relative z-10">{applying === i.id ? 'Processing...' : i.applied ? 'Applied' : 'Apply Now'}</span>
+                       </motion.button>
+                    </div>
+
+                    <div className="relative group/desc mb-12">
+                        <p className="text-[12px] font-medium text-slate-500 uppercase tracking-[2px] leading-relaxed border-l-2 border-amber-500/10 pl-8 max-w-2xl transition-all duration-500">&quot;{i.description}&quot;</p>
+                    </div>
+
+                {/* Action Row */}
+                <div className="mt-8 pt-8 border-t border-slate-100 flex items-center justify-between">
+                       <div className="flex items-center gap-3 pr-8 border-r border-slate-100 shrink-0">
+                          <Terminal size={14} className="text-amber-600/40" />
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[5px]">Required Skills</span>
+                       </div>
+                       <div className="flex flex-wrap gap-3">
+                         {i.required_skills.map((rs) => (
+                           <span key={rs} className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-[4px] border transition-all antialiased ${
+                             mySkills.includes(rs) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-100'
+                           }`}>{mySkills.includes(rs) ? '✓ ' : ''}{rs}</span>
+                         ))}
+                       </div>
+                    </div>
+
+                    {/* Gap Analysis */}
+                    {i.missing_skills.length > 0 && (
+                      <div className="mt-6 p-5 rounded-2xl bg-amber-50/70 border border-amber-100 flex items-start gap-4">
+                        <div className="size-9 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5"><Activity size={15} className="text-amber-600" /></div>
+                        <div className="flex-1">
+                          <div className="text-[10px] font-black text-amber-700 uppercase tracking-[4px] mb-1">Career Gap Analysis</div>
+                          <p className="text-[11px] font-medium text-amber-800/70 mb-3">Add <span className="font-black text-amber-700">{i.missing_skills.length} skill{i.missing_skills.length > 1 ? 's' : ''}</span> to your profile.</p>
+                          <div className="flex flex-wrap gap-2">
+                            {i.missing_skills.map(skill => <span key={skill} className="px-3 py-1 rounded-lg bg-white border border-amber-200 text-[10px] font-black text-amber-700 uppercase tracking-[3px] shadow-sm">+ {skill}</span>)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                 </div>
+                </div>
+              </AnimatedSection>
+            );
+        })}
+      </AnimatePresence>
+    </div>
+
+      {/* AI Interview Simulation Modal */}
+      <AnimatePresence>
+        {aiInterviewModal.open && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
+             <motion.div
+               initial={{ opacity: 0, scale: 0.95, y: 20 }}
+               animate={{ opacity: 1, scale: 1, y: 0 }}
+               exit={{ opacity: 0, scale: 0.95, y: 20 }}
+               className="bg-white rounded-[3rem] shadow-2xl p-12 max-w-2xl w-full border border-slate-100 relative overflow-hidden"
+             >
+               <div className="absolute top-0 right-0 p-8 opacity-5">
+                  <Sparkles size={120} className="text-indigo-600" />
+               </div>
+               <div className="relative z-10">
+                 <div className="flex items-center justify-between mb-10">
+                    <div className="flex items-center gap-3 text-indigo-600">
+                       <Sparkles size={20} className="animate-spin-slow" />
+                       <span className="text-[10px] font-black uppercase tracking-[5px]">AI Simulation Active</span>
+                    </div>
+                    <button 
+                      onClick={() => setAiInterviewModal(prev => ({ ...prev, open: false }))}
+                      className="size-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all font-black text-xs"
+                    >
+                      ✕
+                    </button>
+                 </div>
+                 
+                 <h2 className="text-4xl font-black text-slate-950 uppercase tracking-tighter leading-none mb-4">
+                    Predictive Interview<br />
+                    <span className="text-indigo-600">Simulation.</span>
+                 </h2>
+                 <p className="text-[11px] font-black text-slate-400 uppercase tracking-[3px] mb-12">Targeting: {aiInterviewModal.title}</p>
+                 
+                 <div className="space-y-6 mb-12">
+                   {aiInterviewModal.questions.map((q, idx) => (
+                     <div key={idx} className="p-6 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all">
+                        <div className="flex items-start gap-4">
+                           <span className="text-[10px] font-black text-indigo-600/30 mt-1">0{idx+1}</span>
+                           <p className="text-sm font-bold text-slate-700 leading-relaxed">&quot;{q}&quot;</p>
+                        </div>
+                     </div>
+                   ))}
+                 </div>
+                 
+                 <button 
+                    onClick={() => setAiInterviewModal(prev => ({ ...prev, open: false }))}
+                    className="w-full h-16 rounded-2xl bg-slate-900 text-white font-black text-[11px] uppercase tracking-[5px] hover:bg-black transition-all shadow-lg"
+                 >
+                   End Simulation
+                 </button>
+               </div>
+             </motion.div>
+           </div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,306 +1,296 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
-  Zap, 
-  Plus, 
-  Trash2, 
-  Search,
-  BookOpen,
-  Trophy,
-  Filter,
-  CheckCircle2
+  Zap, Plus, Trash2, Search, BookOpen, Trophy, 
+  Filter, CheckCircle2, Sparkles, TrendingUp, 
+  Activity, Cpu, Terminal, Database, Layers, 
+  ChevronRight, Target, Flame, Star, Lightbulb,
+  ShieldCheck, BarChart3, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
+import AnimatedSection from '@/components/ui/AnimatedSection';
 
-interface Skill { skill_id: number; skill_name: string; category: string | null; }
-interface StudentSkill { skill_id: number; proficiency_level: string; skill: Skill; }
+interface Skill { skill_id: number; skill_name: string; category?: string; }
+interface StudentSkill { skill_id: number; skill_name: string; proficiency_level: string; category?: string; }
 
 const LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert'] as const;
 
-const levelConfig: Record<string, { color: 'primary' | 'secondary' | 'success' | 'warning', icon: any }> = {
-  Beginner: { color: 'primary', icon: BookOpen },
-  Intermediate: { color: 'secondary', icon: TrendingUp },
-  Advanced: { color: 'success', icon: CheckCircle2 },
-  Expert: { color: 'warning', icon: Trophy },
+const levelConfig: Record<string, { color: string, glow: string, bg: string, icon: any, progress: number }> = {
+  'Beginner': { color: 'text-slate-400', glow: '', bg: 'bg-slate-100', icon: BookOpen, progress: 25 },
+  'Intermediate': { color: 'text-amber-600', glow: 'shadow-amber-600/5', bg: 'bg-amber-50', icon: TrendingUp, progress: 50 },
+  'Advanced': { color: 'text-amber-700', glow: 'shadow-amber-700/10', bg: 'bg-amber-100', icon: CheckCircle2, progress: 75 },
+  'Expert': { color: 'text-amber-700', glow: 'shadow-amber-700/20', bg: 'bg-amber-200', icon: Trophy, progress: 100 },
 };
 
-function TrendingUp(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-      <polyline points="16 7 22 7 22 13" />
-    </svg>
-  );
-}
-
 export default function SkillsPage() {
-  const supabase = createClient();
+  const router = useRouter();
   const [allSkills, setAllSkills] = useState<Skill[]>([]);
   const [mySkills, setMySkills] = useState<StudentSkill[]>([]);
   const [adding, setAdding] = useState(false);
-  const [selectedSkillId, setSelectedSkillId] = useState('');
+  const [selectedSkillName, setSelectedSkillName] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<typeof LEVELS[number]>('Beginner');
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [aiInsights, setAiInsights] = useState<{ marketReach: number, nextBestSkill: any } | null>(null);
 
   const load = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user || { id: '00000000-0000-0000-0000-000000000000', email: 'demo@student.com' };
-    setUserId(user.id);
-
-    const [{ data: skills }, { data: mySkillsData }] = await Promise.all([
-      supabase.from('skill').select('*').order('skill_name'),
-      supabase.from('student_skill').select('skill_id, proficiency_level, skill:skill_id (skill_id, skill_name, category)').eq('student_id', user.id),
-    ]);
-
-    setAllSkills(skills ?? []);
-    const normalized = (mySkillsData ?? []).map((s: { skill_id: number; proficiency_level: string; skill: Skill | Skill[] }) => ({
-      skill_id: s.skill_id,
-      proficiency_level: s.proficiency_level,
-      skill: Array.isArray(s.skill) ? s.skill[0] : s.skill,
-    }));
-    setMySkills(normalized);
-    setLoading(false);
-  }, [supabase]);
+    const storedUserId = localStorage.getItem('demo_student_id');
+    if (!storedUserId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const resp = await fetch(`/api/skills?userId=${storedUserId}`);
+      const result = await resp.json();
+      if (result.success) {
+        setAllSkills(result.allSkills || []);
+        setMySkills(result.studentSkills || []);
+        setAiInsights(result.aiInsights);
+      }
+    } catch (err) {
+      console.error('Failed to load skills:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  async function addSkill() {
-    if (!selectedSkillId || !userId) return;
-    setAdding(true);
-    await supabase.from('student_skill').upsert({
-      student_id: userId,
-      skill_id: parseInt(selectedSkillId),
-      proficiency_level: selectedLevel,
+  const skillAnalytics = useMemo(() => {
+    if (mySkills.length === 0) return null;
+    const order = { 'Expert': 4, 'Advanced': 3, 'Intermediate': 2, 'Beginner': 1 };
+    const sorted = [...mySkills].sort((a, b) => 
+      order[b.proficiency_level as keyof typeof order] - order[a.proficiency_level as keyof typeof order]
+    );
+    const categories: Record<string, number> = {};
+    mySkills.forEach(s => {
+      const cat = s.category || 'General';
+      categories[cat] = (categories[cat] || 0) + 1;
     });
-    await load();
-    setSelectedSkillId('');
-    setAdding(false);
+    const topCategory = Object.entries(categories).sort((a,b) => b[1] - a[1])[0]?.[0] || 'Professional';
+    return {
+      topSkill: sorted[0],
+      topCategory,
+      skillCount: mySkills.length,
+      strengthScore: Math.min(Math.round((mySkills.length / 8) * 100), 100)
+    };
+  }, [mySkills]);
+
+  async function handleAddSkill() {
+    if (!selectedSkillName) return;
+    setAdding(true);
+    const storedUserId = localStorage.getItem('demo_student_id');
+    if (!storedUserId) {
+      setAdding(false);
+      return;
+    }
+    try {
+      const response = await fetch('/api/skills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: storedUserId,
+          skillName: selectedSkillName,
+          proficiencyLevel: selectedLevel,
+          action: 'upsert'
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setMySkills(result.data);
+        setSelectedSkillName('');
+      }
+    } catch (err) {
+      console.error('Add skill error:', err);
+    } finally {
+      setAdding(false);
+    }
   }
 
-  async function removeSkill(skill_id: number) {
-    await supabase.from('student_skill').delete().eq('student_id', userId).eq('skill_id', skill_id);
-    await load();
+  async function removeSkill(skillName: string) {
+    const storedUserId = localStorage.getItem('demo_student_id');
+    if (!storedUserId) return;
+    try {
+      const response = await fetch('/api/skills', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: storedUserId,
+          skillName,
+          action: 'delete'
+        })
+      });
+      const result = await response.json();
+      if (result.success) {
+        setMySkills(result.data);
+      }
+    } catch (err) {
+      console.error('Remove skill error:', err);
+    }
   }
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
-      <motion.div 
-        animate={{ scale: [1, 1.2, 1] }}
-        transition={{ duration: 1.5, repeat: Infinity }}
-        className="text-indigo-600"
-      >
-        <Zap size={40} fill="currentColor" />
+    <div className="flex flex-col items-center justify-center h-[70vh] gap-10">
+      <motion.div animate={{ rotate: 360, scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }} className="text-amber-600">
+        <Cpu size={80} className="fill-amber-600/10" />
       </motion.div>
-      <p className="text-slate-500 font-medium">Loading your skillset...</p>
+      <div className="text-center">
+         <h2 className="text-xs font-black uppercase tracking-[12px] text-amber-600 mb-4 antialiased">Calibrating Attributes</h2>
+         <p className="text-slate-500 text-[10px] font-black uppercase tracking-[6px] animate-pulse">Syncing Professional Intelligence Records</p>
+      </div>
     </div>
   );
 
-  const mySkillIds = new Set(mySkills.map(s => s.skill_id));
   const availableSkills = allSkills
-    .filter(s => !mySkillIds.has(s.skill_id))
-    .filter(s => s.skill_name.toLowerCase().includes(searchQuery.toLowerCase()));
+    .filter(s => s.skill_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a,b) => a.skill_name.localeCompare(b.skill_name));
 
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-bold mb-3 uppercase tracking-wider">
-            <Zap size={14} fill="currentColor" />
-            Competitive Edge
+    <div className="space-y-12 pb-24 max-w-7xl mx-auto">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-12 pb-12 border-b border-slate-100">
+        <AnimatedSection direction="up" distance={40} className="max-w-2xl">
+          <div className="flex items-center gap-4 mb-6">
+             <div className="size-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                <Cpu size={18} className="animate-pulse" />
+             </div>
+             <h2 className="text-[10px] font-black uppercase tracking-[8px] text-slate-400">Competitive Edge Center</h2>
           </div>
-          <h1 className="text-3xl font-display font-bold text-slate-900 tracking-tight">My Skills Portfolio</h1>
-          <p className="text-slate-500 font-medium max-w-md mt-1">Showcase your expertise and get matched with relevant internships.</p>
-        </motion.div>
-
-        <div className="flex items-center gap-2 text-sm text-slate-500 font-medium bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100">
-           <Trophy size={16} className="text-amber-500" />
-           <span>Level: <span className="text-slate-900 font-bold">{mySkills.length > 5 ? 'Expert' : 'Rising Star'}</span></span>
-        </div>
+          <h1 className="text-5xl md:text-7xl font-black text-slate-950 tracking-tight uppercase leading-[0.9] mb-6">
+            Skill<br /><span className="text-amber-600">Inventory.</span>
+          </h1>
+          <p className="text-slate-500 font-medium text-lg leading-relaxed uppercase tracking-tight">Manage verified competencies and align with organizational demand.</p>
+        </AnimatedSection>
+        
+        <AnimatedSection direction="up" className="flex items-center gap-8 bg-slate-900 px-10 py-8 rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden group" delay={0.2}>
+           <div className="absolute inset-0 bg-gradient-to-br from-amber-600/20 to-transparent opacity-50 pointer-events-none" />
+           <div className="size-16 rounded-2xl bg-white/10 flex items-center justify-center text-amber-500 border border-white/5 shadow-inner"><Target size={28} /></div>
+           <div className="flex flex-col relative z-10">
+              <span className="text-[9px] font-black uppercase tracking-[4px] text-white/40 mb-1">Market Reach Score</span>
+              <span className="text-3xl font-black tracking-tighter text-white">{aiInsights?.marketReach || 0}%</span>
+              <div className="flex items-center gap-2 mt-2">
+                <div className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-[9px] font-bold uppercase tracking-[2px] text-white/60">AI Intelligence Optimized</span>
+              </div>
+           </div>
+        </AnimatedSection>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Add Skill Panel */}
-        <div className="xl:col-span-1 space-y-6">
-          <Card className="border-none shadow-xl shadow-indigo-100/20 bg-gradient-to-br from-white to-indigo-50/30 overflow-hidden">
-            <div className="absolute top-0 right-0 p-4">
-               <SparklesIcon size={24} className="text-indigo-200" />
-            </div>
-            <CardHeader>
-              <CardTitle className="text-xl">Add New Skill</CardTitle>
-              <CardDescription>Select a skill from the catalog to add to your profile.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                  <Search size={14} /> Search Skills
-                </label>
-                <div className="relative">
-                   <select
-                    id="skill-select"
-                    value={selectedSkillId}
-                    onChange={e => setSelectedSkillId(e.target.value)}
-                    className="w-full h-11 px-4 rounded-xl border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-sm appearance-none bg-white font-medium pr-10"
-                  >
-                    <option value="">Choose a skill...</option>
-                    {availableSkills.map(s => <option key={s.skill_id} value={s.skill_id}>{s.skill_name}</option>)}
-                  </select>
-                  <Filter size={16} className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" />
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
+         <div className="xl:col-span-1 space-y-10">
+            <AnimatedSection direction="up" className="space-y-8">
+                <div className="flex items-center gap-4">
+                    <div className="size-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-amber-600 shadow-sm"><Plus size={20} /></div>
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Inventory Management</h2>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                  <TrendingUp size={14} /> Proficiency Level
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {LEVELS.map(level => (
-                    <button
-                      key={level}
-                      onClick={() => setSelectedLevel(level)}
-                      className={cn(
-                        "px-3 py-2.5 rounded-lg border text-xs font-bold transition-all text-center",
-                        selectedLevel === level 
-                          ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-100" 
-                          : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300"
-                      )}
-                    >
-                      {level}
-                    </button>
-                  ))}
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] ml-1">Search & Select</label>
+                        <select value={selectedSkillName} onChange={e => setSelectedSkillName(e.target.value)} className="w-full h-16 pl-6 pr-12 rounded-2xl border border-slate-100 bg-slate-50 text-[11px] font-black uppercase tracking-[2px] focus:border-amber-500/30 outline-none appearance-none">
+                            <option value="">Select competency...</option>
+                            {availableSkills.map(s => <option key={s.skill_id} value={s.skill_name}>{s.skill_name}</option>)}
+                        </select>
+                    </div>
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] ml-1">Proficiency Level</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            {LEVELS.map(level => (
+                                <button key={level} onClick={() => setSelectedLevel(level)} className={`px-4 py-4 rounded-xl border text-[9px] font-black uppercase tracking-[2px] transition-all ${selectedLevel === level ? "bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-600/20 scale-105" : "bg-white border-slate-100 text-slate-400 hover:border-amber-200"}`}>{level}</button>
+                            ))}
+                        </div>
+                    </div>
+                    <motion.button whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }} onClick={handleAddSkill} disabled={!selectedSkillName || adding} className={`w-full h-16 rounded-2xl text-[10px] font-black uppercase tracking-[4px] flex items-center justify-center gap-4 transition-all shadow-xl ${!selectedSkillName || adding ? "bg-slate-50 text-slate-300 cursor-not-allowed" : "bg-slate-900 text-white"}`}>
+                        {adding ? <Activity className="animate-spin size-4" /> : <Zap size={16} className="fill-current" />}
+                        {adding ? 'Processing...' : 'SECURE COMPETENCY'}
+                    </motion.button>
                 </div>
-              </div>
+            </AnimatedSection>
 
-              <Button
-                id="add-skill-btn"
-                onClick={addSkill}
-                disabled={!selectedSkillId || adding}
-                className="w-full h-12 rounded-xl text-md font-bold gap-2 mt-2"
-              >
-                {adding ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity }}><Zap size={16} /></motion.div> : <Plus size={18} />}
-                {adding ? 'Adding...' : 'Add to Portfolio'}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Skills List */}
-        <div className="xl:col-span-2">
-          <div className="flex items-center justify-between mb-6">
-             <h2 className="text-xl font-display font-bold text-slate-900">Your Expertise</h2>
-             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{mySkills.length} SKILLS TOTAL</span>
-          </div>
-
-          {mySkills.length === 0 ? (
-            <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200 space-y-4">
-               <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto text-slate-300">
-                  <BookOpen size={28} />
-               </div>
-               <div>
-                 <p className="text-slate-900 font-bold">No skills listed yet</p>
-                 <p className="text-sm text-slate-500">Add your technical and soft skills to stand out.</p>
-               </div>
-            </div>
-          ) : (
-            <motion.div 
-              layout
-              className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-            >
-              <AnimatePresence mode="popLayout">
-                {mySkills.map((ms, index) => {
-                  const config = levelConfig[ms.proficiency_level] || { color: 'secondary', icon: Zap };
-                  return (
-                    <motion.div
-                      key={ms.skill_id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <Card className="group relative overflow-hidden hover:shadow-lg transition-all duration-300 border-slate-100 bg-white shadow-sm border-none">
-                        <div className={`absolute top-0 left-0 bottom-0 w-1 transition-all group-hover:w-1.5 ${
-                          ms.proficiency_level === 'Expert' ? 'bg-amber-400' : 
-                          ms.proficiency_level === 'Advanced' ? 'bg-emerald-400' : 'bg-indigo-400'
-                        }`} />
-                        <CardHeader className="flex flex-row items-start justify-between p-5 pb-2">
-                          <div className="space-y-1">
-                             <Badge variant={config.color} className="gap-1.5 px-2 py-1 rounded-lg">
-                               <config.icon size={12} />
-                               {ms.proficiency_level}
-                             </Badge>
-                             <CardTitle className="text-lg font-bold group-hover:text-indigo-600 transition-colors uppercase pt-2">
-                               {ms.skill?.skill_name}
-                             </CardTitle>
-                          </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => removeSkill(ms.skill_id)}
-                            className="h-8 w-8 text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all rounded-lg"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </CardHeader>
-                        <CardContent className="px-5 pb-5">
-                           {ms.skill?.category && (
-                             <div className="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
-                                {ms.skill.category}
+            <AnimatedSection direction="up" delay={0.2} className="space-y-8">
+                <div className="flex items-center gap-4">
+                    <div className="size-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm"><Lightbulb size={20} /></div>
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Market Alignment</h2>
+                </div>
+                <div className="p-8 bg-slate-950 rounded-[2.5rem] border border-white/5 space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Sparkles size={14} className="text-amber-500" />
+                        <span className="text-[10px] font-black uppercase tracking-[3px] text-amber-500">Gap Intelligence</span>
+                    </div>
+                    <div className="space-y-4">
+                        {aiInsights?.nextBestSkill ? (
+                             <div className="p-5 bg-white/5 rounded-2xl border border-white/10 border-l-amber-600/50">
+                                <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-tight">
+                                    Acquiring <span className="text-amber-500">{aiInsights.nextBestSkill.name}</span> will increase your market reach by <span className="text-amber-500">{aiInsights.nextBestSkill.boost}%</span>.
+                                </p>
                              </div>
-                           )}
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </div>
+                        ) : (
+                            <div className="p-5 bg-white/5 rounded-2xl border border-white/10 border-l-emerald-600/50">
+                                <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-tight">
+                                    Your current stack has maximum market compatibility.
+                                </p>
+                             </div>
+                        )}
+                        <div className="p-5 bg-white/5 rounded-2xl border border-white/10">
+                          <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-tight">AI has detected emerging demand for <span className="text-amber-500">Distributed Systems</span>.</p>
+                        </div>
+                    </div>
+                </div>
+            </AnimatedSection>
+         </div>
+
+         <div className="xl:col-span-2 space-y-10">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-8">
+                <div className="flex items-center gap-4">
+                    <div className="size-10 rounded-xl bg-slate-50 text-slate-700 border border-slate-100 flex items-center justify-center shadow-sm"><Layers size={18} /></div>
+                    <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Active Skill Matrix</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[9px] font-black uppercase tracking-[3px] text-slate-400">{mySkills.length} Verified Entries</span>
+                </div>
+            </div>
+
+            {mySkills.length === 0 ? (
+                <div className="p-32 text-center bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
+                    <Database size={48} className="text-slate-200 mx-auto mb-8 animate-pulse" />
+                    <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-4 text-slate-950 font-black">Empty Repository</h3>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <AnimatePresence mode="popLayout">
+                        {mySkills.map((ms, index) => {
+                            const config = levelConfig[ms.proficiency_level] || levelConfig['Beginner'];
+                            return (
+                                <motion.div key={ms.skill_name} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: index * 0.05 }} className="group relative bg-white p-8 rounded-[2.5rem] border border-slate-100 hover:border-amber-500/30 transition-all duration-500 shadow-sm hover:shadow-xl">
+                                    <div className="flex justify-between items-start mb-10">
+                                        <div className="space-y-4">
+                                            <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border ${config.bg} ${config.color} border-transparent shadow-sm`}>
+                                                <config.icon size={11} className="animate-pulse" />
+                                                <span className="text-[9px] font-black uppercase tracking-[2px]">{ms.proficiency_level}</span>
+                                            </div>
+                                            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tighter group-hover:text-amber-600 transition-colors leading-none">{ms.skill_name}</h3>
+                                        </div>
+                                        <button onClick={() => removeSkill(ms.skill_name)} className="size-10 rounded-xl flex items-center justify-center text-slate-200 hover:text-rose-500 hover:bg-rose-50 transition-all"><Trash2 size={16} /></button>
+                                    </div>
+                                    <div className="space-y-3 mb-10">
+                                        <div className="flex justify-between text-[8px] font-black uppercase tracking-[2px] text-slate-400">
+                                            <span>Proficiency Index</span>
+                                            <span>{config.progress}%</span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                            <motion.div initial={{ width: 0 }} animate={{ width: `${config.progress}%` }} className={`h-full rounded-full ${ms.proficiency_level === 'Expert' ? 'bg-amber-600' : ms.proficiency_level === 'Advanced' ? 'bg-amber-500' : ms.proficiency_level === 'Intermediate' ? 'bg-amber-400' : 'bg-slate-300'}`} />
+                                        </div>
+                                    </div>
+                                    <div className={`absolute top-0 left-0 bottom-0 w-1 ${ms.proficiency_level === 'Expert' ? 'bg-amber-600' : 'bg-slate-100'}`} />
+                                </motion.div>
+                            );
+                        })}
+                    </AnimatePresence>
+                </div>
+            )}
+         </div>
       </div>
     </div>
   );
 }
-
-const SparklesIcon = ({ size, className }: any) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    width={size} 
-    height={size} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
-    <path d="M5 3v4"/>
-    <path d="M19 17v4"/>
-    <path d="M3 5h4"/>
-    <path d="M17 19h4"/>
-  </svg>
-);

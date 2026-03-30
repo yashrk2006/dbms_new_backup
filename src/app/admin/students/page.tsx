@@ -1,153 +1,269 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { 
+  Users, GraduationCap, Search, Filter, 
+  MoreVertical, Mail, BookOpen, Target,
+  TrendingUp, Award, AlertCircle, CheckCircle2,
+  ChevronRight, ArrowUpRight, LayoutGrid, List,
+  Database, Activity
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Student {
   student_id: string;
   name: string;
   email: string;
-  college: string | null;
-  branch: string | null;
-  graduation_year: number | null;
-  resume_url: string | null;
-  skill_count: number;
-  application_count: number;
+  college: string;
+  branch: string;
+  academic_year: string;
+  student_skill?: { skill_name: string; level: string }[];
 }
 
 export default function AdminStudentsPage() {
-  const supabase = createClient();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     async function load() {
-      const { data: studentData } = await supabase
-        .from('student')
-        .select('student_id, name, email, college, branch, graduation_year, resume_url')
-        .order('name');
-
-      if (!studentData) { setLoading(false); return; }
-
-      // Enrich with skill & application counts
-      const enriched: Student[] = await Promise.all(
-        studentData.map(async (s) => {
-          const [{ count: skillCount }, { count: appCount }] = await Promise.all([
-            supabase.from('student_skill').select('*', { count: 'exact', head: true }).eq('student_id', s.student_id),
-            supabase.from('application').select('*', { count: 'exact', head: true }).eq('student_id', s.student_id),
-          ]);
-          return { ...s, skill_count: skillCount ?? 0, application_count: appCount ?? 0 };
-        })
-      );
-
-      setStudents(enriched);
-      setLoading(false);
+      try {
+        const response = await fetch('/api/admin/students');
+        const result = await response.json();
+        if (result.success && result.data) {
+          setStudents(result.data);
+        }
+      } catch (err) {
+        console.error('Failed to load students:', err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
-  }, [supabase]);
+  }, []);
 
-  if (loading) return <div style={{ color: 'var(--color-text-secondary)', padding: '2rem' }}>Loading students...</div>;
-
-  const filtered = students.filter(s =>
+  const filtered = students.filter(s => 
     s.name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.email?.toLowerCase().includes(search.toLowerCase()) ||
-    s.college?.toLowerCase().includes(search.toLowerCase()) || ''
+    s.college?.toLowerCase().includes(search.toLowerCase()) ||
+    s.branch?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center h-[70vh] gap-8">
+      <motion.div
+        animate={{ rotate: 360, scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        className="text-amber-600"
+      >
+        <Users size={64} fill="currentColor" />
+      </motion.div>
+      <div className="text-center">
+        <h2 className="text-[10px] font-black uppercase tracking-[10px] text-amber-600 mb-2">Syncing Directory</h2>
+        <p className="text-slate-500 text-[9px] font-bold uppercase tracking-[5px] animate-pulse">Accessing Human Capital Registry</p>
+      </div>
+    </div>
   );
 
   return (
-    <div>
-      <div style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>👩‍🎓 All Students</h1>
-        <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.95rem' }}>
-          {students.length} registered students in the system.
-        </p>
+    <div className="space-y-10 pb-20 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pb-10 border-b border-slate-100">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+             <div className="size-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                <Users size={14} />
+             </div>
+             <h2 className="text-[10px] font-black uppercase tracking-[6px] text-slate-400">Human Capital Management</h2>
+          </div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">Student Directory</h1>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+           <div className="relative flex-1 sm:w-80 group">
+              <input 
+                type="text" 
+                placeholder="SEARCH REGISTRY..." 
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full h-14 pl-12 pr-6 rounded-2xl border border-slate-100 bg-white text-[10px] font-black uppercase tracking-[3px] focus:border-amber-500/30 transition-all shadow-sm" 
+              />
+              <Search size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-amber-500 transition-colors" />
+           </div>
+           
+           <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
+              <button 
+                onClick={() => setViewMode('grid')}
+                className={`p-2.5 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button 
+                onClick={() => setViewMode('list')}
+                className={`p-2.5 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                <List size={16} />
+              </button>
+           </div>
+        </div>
       </div>
 
-      <input
-        type="text"
-        placeholder="Search by name, email, or college..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        style={{
-          width: '100%', maxWidth: 480, padding: '0.75rem 1rem', marginBottom: '1.5rem',
-          background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
-          borderRadius: '8px', color: 'var(--color-text-primary)', fontSize: '0.9rem', outline: 'none',
-        }}
-      />
+      {/* KPI Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        {[
+          { label: 'Verified Students', value: students.length, icon: CheckCircle2, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Placement Ready', value: students.filter(s => (s.student_skill?.length ?? 0) > 4).length, icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Active Seekers', value: Math.round(students.length * 0.85), icon: Activity, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'At Risk', value: students.filter(s => (s.student_skill?.length ?? 0) < 2).length, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' },
+        ].map(stat => (
+          <div key={stat.label} className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group">
+             <div className="flex items-center justify-between mb-4">
+                <div className={`size-10 rounded-xl ${stat.bg} ${stat.color} flex items-center justify-center border border-transparent group-hover:border-current transition-all`}>
+                  <stat.icon size={16} />
+                </div>
+                <ArrowUpRight size={14} className="text-slate-200 group-hover:text-slate-400 transition-colors" />
+             </div>
+             <div className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mb-1">{stat.label}</div>
+             <div className="text-3xl font-black text-slate-900 tracking-tighter">{stat.value}</div>
+          </div>
+        ))}
+      </div>
 
-      <div className="glass-card" style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem' }}>#</th>
-              <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem' }}>Student</th>
-              <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem' }}>College</th>
-              <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem' }}>Branch</th>
-              <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem' }}>Grad Year</th>
-              <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem' }}>Skills</th>
-              <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem' }}>Applications</th>
-              <th style={{ padding: '1rem', fontWeight: 600, fontSize: '0.85rem' }}>Resume</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                  No students found.
-                </td>
-              </tr>
-            ) : filtered.map((s, i) => (
-              <tr key={s.student_id} style={{
-                borderBottom: '1px solid var(--color-border)',
-                transition: 'background 0.15s',
-              }}>
-                <td style={{ padding: '1rem', color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{i + 1}</td>
-                <td style={{ padding: '1rem' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{s.name || '—'}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginTop: '0.15rem' }}>{s.email}</div>
-                </td>
-                <td style={{ padding: '1rem', fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-                  {s.college || '—'}
-                </td>
-                <td style={{ padding: '1rem', fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-                  {s.branch || '—'}
-                </td>
-                <td style={{ padding: '1rem', fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>
-                  {s.graduation_year || '—'}
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  <span style={{
-                    padding: '0.2rem 0.65rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600,
-                    background: s.skill_count > 0 ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.04)',
-                    color: s.skill_count > 0 ? 'var(--color-primary-light)' : 'var(--color-text-muted)',
-                  }}>
-                    {s.skill_count} skill{s.skill_count !== 1 ? 's' : ''}
-                  </span>
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  <span style={{
-                    padding: '0.2rem 0.65rem', borderRadius: '999px', fontSize: '0.8rem', fontWeight: 600,
-                    background: s.application_count > 0 ? 'rgba(34,211,238,0.1)' : 'rgba(255,255,255,0.04)',
-                    color: s.application_count > 0 ? '#22d3ee' : 'var(--color-text-muted)',
-                  }}>
-                    {s.application_count} app{s.application_count !== 1 ? 's' : ''}
-                  </span>
-                </td>
-                <td style={{ padding: '1rem' }}>
-                  {s.resume_url ? (
-                    <a href={s.resume_url} target="_blank" rel="noreferrer" style={{
-                      color: 'var(--color-primary-light)', fontSize: '0.85rem', textDecoration: 'none',
-                    }}>📄 View</a>
-                  ) : (
-                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>—</span>
-                  )}
-                </td>
-              </tr>
+      {filtered.length === 0 ? (
+        <div className="p-32 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
+            <Search size={48} className="text-slate-200 mx-auto mb-6 animate-pulse" />
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">No Results Found</h3>
+            <p className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mt-2">Try adjusting your search parameters.</p>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <AnimatePresence mode="popLayout">
+            {filtered.map((s, idx) => (
+              <motion.div
+                key={s.student_id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.2, delay: idx * 0.05 }}
+                className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm hover:shadow-xl hover:border-amber-200 transition-all duration-500 group relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-8 opacity-0 group-hover:opacity-10 transition-opacity">
+                  <GraduationCap size={100} className="text-amber-600" />
+                </div>
+
+                <div className="flex items-start justify-between mb-8">
+                  <div className="size-16 rounded-2xl bg-amber-600/10 flex items-center justify-center text-amber-600 border border-amber-600/20 group-hover:bg-amber-600 group-hover:text-white transition-all duration-500 shadow-inner">
+                    <span className="text-xl font-black">{s.name?.charAt(0) || 'S'}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-[3px] mb-1">Batch ID</span>
+                    <span className="text-[10px] font-bold text-slate-400 font-mono">#{s.student_id.slice(0, 8)}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter line-clamp-1 mb-1 group-hover:text-amber-600 transition-colors">{s.name}</h3>
+                    <div className="flex items-center gap-2">
+                       <Mail size={12} className="text-slate-300" />
+                       <span className="text-[10px] font-bold text-slate-400 line-clamp-1">{s.email}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-6 border-t border-slate-50">
+                    <div>
+                      <div className="text-[8px] font-black text-slate-300 uppercase tracking-[3px] mb-1">Branch Focus</div>
+                      <div className="text-[10px] font-black text-slate-600 uppercase tracking-[2px] line-clamp-1">{s.branch || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[8px] font-black text-slate-300 uppercase tracking-[3px] mb-1">Academic Year</div>
+                      <div className="text-[10px] font-black text-slate-600 uppercase tracking-[2px]">{s.academic_year || 'N/A'} Year</div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 group-hover:bg-amber-50 group-hover:border-amber-100 transition-all">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-[3px]">Skill Strength</span>
+                      <span className="text-[9px] font-black text-amber-600">{(s.student_skill?.length ?? 0) * 20}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white rounded-full overflow-hidden border border-slate-100">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        whileInView={{ width: `${(s.student_skill?.length ?? 0) * 20}%` }}
+                        className="h-full bg-amber-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-8 border-t border-slate-50 flex items-center justify-between">
+                   <div className="flex items-center gap-2">
+                      <BookOpen size={14} className="text-amber-600/40" />
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[2px] line-clamp-1">{s.college || 'Career Institute'}</span>
+                   </div>
+                   <ChevronRight size={16} className="text-slate-200 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
+                </div>
+              </motion.div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </AnimatePresence>
+        </div>
+      ) : (
+        <div className="bg-white rounded-[2rem] border border-slate-100 overflow-hidden shadow-sm">
+           <table className="w-full text-left border-collapse">
+              <thead>
+                 <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[3px]">Student</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[3px]">Academic Details</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[3px]">Skills Portfolio</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[3px]">Status</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[3px] text-right">Actions</th>
+                 </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                 {filtered.map((s) => (
+                   <tr key={s.student_id} className="hover:bg-slate-50/50 transition-colors group">
+                      <td className="px-8 py-6">
+                         <div className="flex items-center gap-4">
+                            <div className="size-10 rounded-xl bg-amber-600/10 flex items-center justify-center text-amber-600 font-black text-xs border border-amber-600/20 group-hover:bg-amber-600 group-hover:text-white transition-all">
+                               {s.name?.charAt(0) || 'S'}
+                            </div>
+                            <div>
+                               <div className="text-sm font-black text-slate-900 uppercase tracking-tight">{s.name}</div>
+                               <div className="text-[10px] font-bold text-slate-400">{s.email}</div>
+                            </div>
+                         </div>
+                      </td>
+                      <td className="px-8 py-6">
+                         <div className="text-[10px] font-black text-slate-600 uppercase tracking-[2px] mb-1">{s.branch}</div>
+                         <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{s.college}</div>
+                      </td>
+                      <td className="px-8 py-6">
+                         <div className="flex items-center gap-4">
+                            <div className="h-2 w-24 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+                               <div className="h-full bg-amber-500" style={{ width: `${(s.student_skill?.length ?? 0) * 20}%` }} />
+                            </div>
+                            <span className="text-[10px] font-black text-slate-500 uppercase">{(s.student_skill?.length ?? 0)} Skills</span>
+                         </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                          (s.student_skill?.length ?? 0) > 4 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                        }`}>
+                          {(s.student_skill?.length ?? 0) > 4 ? 'Elite Ready' : 'Active'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                         <button className="p-2 rounded-lg text-slate-300 hover:text-slate-900 transition-colors">
+                            <MoreVertical size={18} />
+                         </button>
+                      </td>
+                   </tr>
+                 ))}
+              </tbody>
+           </table>
+        </div>
+      )}
     </div>
   );
 }
