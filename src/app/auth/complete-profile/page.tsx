@@ -1,19 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'react-hot-toast';
-import { Building2, GraduationCap, MapPin, Briefcase, Calendar, Code, Sparkles, LogIn, Zap } from 'lucide-react';
+import { Building2, GraduationCap, MapPin, Briefcase, Calendar, Sparkles, Zap } from 'lucide-react';
 import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
 
-export default function CompleteProfile() {
+function CompleteProfileContent() {
   const [session, setSession] = useState<any>(null);
   const [role, setRole] = useState<'student' | 'company' | null>(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Student Fields
   const [studentData, setStudentData] = useState({
@@ -39,11 +40,17 @@ export default function CompleteProfile() {
 
       setSession(session);
       
-      // Get role from session metadata (most secure) or fallback to student
-      const userRole = session.user.user_metadata?.role || 'student';
-      setRole(userRole as any);
+      // Role Detection Logic: 
+      // 1. Query Param (from callback)
+      // 2. User Metadata (from previous sessions)
+      // 3. Fallback to student
+      const urlRole = searchParams.get('role') as any;
+      const metaRole = session.user.user_metadata?.role;
+      const finalRole = urlRole || metaRole || 'student';
+      
+      setRole(finalRole);
 
-      // Security Check: Cross-persona detection
+      // Security Check: Existing persona detection
       const { data: isStudent } = await supabase.from('student').select('student_id').eq('student_id', session.user.id).single();
       const { data: isCompany } = await supabase.from('company').select('company_name').eq('company_id', session.user.id).single();
       const { data: isAdmin } = await supabase.from('admin').select('admin_id').eq('admin_id', session.user.id).single();
@@ -53,20 +60,14 @@ export default function CompleteProfile() {
           return;
       }
 
-      if (isStudent && userRole === 'student') { router.push('/dashboard'); return; }
-      if (isCompany && userRole === 'company') { router.push('/company'); return; }
+      // If already has profile, redirect to respective dashboard
+      if (isStudent && finalRole === 'student') { router.push('/dashboard'); return; }
+      if (isCompany && finalRole === 'company') { router.push('/company'); return; }
 
-      // If conflicting persona found
-      if (isStudent || isCompany) {
-          toast.error("Cross-persona conflict detected. Merging or switching roles is currently restricted.");
-          setLoading(false);
-          return;
-      }
-      
       setLoading(false);
     }
     checkAuth();
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,26 +75,42 @@ export default function CompleteProfile() {
 
     try {
       if (role === 'student') {
-        const { error } = await supabase.from('student').insert({
+        const fullName = session.user.user_metadata.full_name || session.user.email?.split('@')[0];
+        
+        // 1. Insert into Student table
+        const { error: dbError } = await supabase.from('student').insert({
           student_id: session.user.id,
-          name: session.user.user_metadata.full_name || session.user.email?.split('@')[0],
+          name: fullName,
           email: session.user.email!,
           college: studentData.college,
           branch: studentData.branch,
           graduation_year: studentData.graduation_year
         });
-        if (error) throw error;
+        if (dbError) throw dbError;
+
+        // 2. Update Auth Metadata for RBAC persistence
+        await supabase.auth.updateUser({
+          data: { role: 'student', full_name: fullName }
+        });
+
         toast.success('Student ID Synthesized');
         router.push('/dashboard');
-      } else {
-        const { error } = await supabase.from('company').insert({
+      } else if (role === 'company') {
+        // 1. Insert into Company table
+        const { error: dbError } = await supabase.from('company').insert({
           company_id: session.user.id,
           company_name: companyData.company_name,
           email: session.user.email!,
           industry: companyData.industry,
           location: companyData.location
         });
-        if (error) throw error;
+        if (dbError) throw dbError;
+
+        // 2. Update Auth Metadata
+        await supabase.auth.updateUser({
+          data: { role: 'company', full_name: companyData.company_name }
+        });
+
         toast.success('Corporate Identity Activated');
         router.push('/company');
       }
@@ -245,3 +262,12 @@ export default function CompleteProfile() {
     </div>
   );
 }
+
+export default function CompleteProfile() {
+  return (
+    <Suspense fallback={null}>
+      <CompleteProfileContent />
+    </Suspense>
+  );
+}
+

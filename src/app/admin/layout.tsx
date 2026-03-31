@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { ReactNode, useEffect, useState } from 'react';
-import { LayoutDashboard, GraduationCap, Briefcase, ArrowLeft, Crown, LogOut, BarChart3, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, GraduationCap, Briefcase, ArrowLeft, Crown, BarChart3, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { LogoutButton } from '@/components/auth/LogoutButton';
 
 const navItems = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard },
@@ -28,15 +29,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Verify Administrative Privileges
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', session.user.id)
-        .single();
+      // Verify Administrative Privileges via metadata (sync'd by middleware/callback)
+      const role = session.user.app_metadata?.role || session.user.user_metadata?.role;
 
-      if (profile?.role !== 'admin') {
-        router.push('/dashboard'); // Kick out non-admins to student dashboard
+      if (role !== 'admin') {
+        router.push('/dashboard'); 
         return;
       }
 
@@ -46,11 +43,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     
     checkAdmin();
   }, [router]);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
-  };
 
   if (loading || !authorized) {
     return (
@@ -97,13 +89,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <ArrowLeft size={18} />
             Back to App
           </Link>
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500/60 hover:text-red-500 hover:bg-red-50 transition-all text-sm font-semibold"
-          >
-            <LogOut size={18} />
-            Sign Out
-          </button>
+          <LogoutButton className="hover:bg-red-50 text-red-500/60 transition-all" />
         </div>
       </aside>
 
@@ -113,3 +99,4 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+

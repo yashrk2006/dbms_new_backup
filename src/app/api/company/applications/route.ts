@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { AI_ENGINE } from '@/lib/ai-engine';
+import { NotificationService } from '@/lib/notifications';
 
 export async function GET(request: Request) {
   try {
@@ -81,6 +82,22 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing fields' }, { status: 400 });
     }
 
+    // 1. Fetch current application state to get context for email
+    const { data: application, error: fetchError } = await supabase
+      .from('application')
+      .select(`
+        *,
+        student(name, email),
+        internship(title)
+      `)
+      .eq('application_id', applicationId)
+      .single();
+
+    if (fetchError || !application) {
+      return NextResponse.json({ success: false, error: 'Application context not found' }, { status: 404 });
+    }
+
+    // 2. Update status
     const { data: updated, error } = await supabase
       .from('application')
       .update({ status } as any)
@@ -93,9 +110,27 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, error: 'Application not found' }, { status: 404 });
     }
 
+    // 3. Trigger Notification
+    try {
+      const student = (application as any).student;
+      const internship = (application as any).internship;
+
+      if (student?.email) {
+          await NotificationService.notifyStatusUpdate(
+            student.email,
+            student.name,
+            internship.title,
+            status
+          );
+      }
+    } catch (notifyError) {
+      console.warn('⚠️ Status update notification failed:', notifyError);
+    }
+
     return NextResponse.json({ success: true, data: updated });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+

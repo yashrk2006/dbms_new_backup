@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { AI_ENGINE } from '@/lib/ai-engine';
+import { NotificationService } from '@/lib/notifications';
 
 export async function GET(request: Request) {
   try {
@@ -70,20 +71,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'You have already applied for this internship' }, { status: 400 });
     }
 
-    // 2. Fetch Student Skills and Internship Requirements for AI
-    const [studentRes, internshipRes] = await Promise.all([
+    // 2. Fetch Student Skills and Internship/Company Details for AI and Notifications
+    const [studentRes, internshipRes, studentDataRes] = await Promise.all([
       supabase.from('student_skill').select('skill(skill_name)').eq('student_id', userId),
       supabase.from('internship_requirements').select('skill(skill_name)').eq('internship_id', internshipId),
+      supabase.from('student').select('name, email').eq('student_id', userId).single(),
     ]);
 
     const { data: internshipData } = await supabase
       .from('internship')
-      .select('title')
+      .select(`
+        title,
+        company(company_name, email)
+      `)
       .eq('internship_id', internshipId)
       .single();
 
-    if (studentRes.error || internshipRes.error || !internshipData) {
-      return NextResponse.json({ success: false, error: 'Context for AI matching not found' }, { status: 404 });
+    if (studentRes.error || internshipRes.error || !internshipData || studentDataRes.error) {
+      return NextResponse.json({ success: false, error: 'Context for AI matching or notifications not found' }, { status: 404 });
     }
 
     const studentSkills = (studentRes.data || []).map((s: any) => s.skill.skill_name);
@@ -92,7 +97,7 @@ export async function POST(request: Request) {
     const matchScore = AI_ENGINE.calculateMatchScore(studentSkills, requiredSkills);
     const interviewQuestions = AI_ENGINE.generateInterviewQuestions(studentSkills, internshipData.title);
 
-    // 3. Create Application (application_id is SERIAL)
+    // 3. Create Application
     const { data: newApp, error: insertError } = await supabase
       .from('application')
       .insert({
@@ -107,6 +112,19 @@ export async function POST(request: Request) {
 
     if (insertError) throw insertError;
 
+    // 4. Trigger Notifications (Async/Non-blocking preferred, but we'll await for safety in demo)
+    try {
+      const student = studentDataRes.data;
+      const company = (internshipData as any).company;
+
+      await Promise.all([
+        NotificationService.notifyApplicationReceived(student.email, student.name, internshipData.title),
+        NotificationService.notifyCompanyNewApplicant(company.email, student.name, internshipData.title)
+      ]);
+    } catch (notifyError) {
+      console.warn('⚠️ Notification failed, but application succeeded:', notifyError);
+    }
+
     return NextResponse.json({ 
       success: true, 
       data: newApp
@@ -116,6 +134,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+
 
 export async function DELETE(request: Request) {
   try {

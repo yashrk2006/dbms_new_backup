@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { ReactNode, useState, useEffect } from 'react';
-import { LayoutDashboard, Users, Briefcase, ArrowLeft, Building2, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, Briefcase, ArrowLeft, Building2, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
 import { LiquidProgressBar } from '@/components/ui/LiquidProgressBar';
 import GsapMagnetic from '@/components/ui/GsapMagnetic';
 import { supabase } from '@/lib/supabase';
+import { LogoutButton } from '@/components/auth/LogoutButton';
 
 const navItems = [
   { href: '/company', label: 'Company Overview', icon: LayoutDashboard },
@@ -30,6 +31,12 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
         return;
       }
       
+      const role = session.user.app_metadata?.role || session.user.user_metadata?.role;
+      if (role !== 'company') {
+        router.push('/dashboard');
+        return;
+      }
+
       const userId = session.user.id;
       setAuthorized(true);
       
@@ -47,11 +54,6 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
     }
     initSession();
   }, [router]);
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push('/');
-  }
 
   if (!authorized) {
     return (
@@ -111,13 +113,9 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
             </Link>
           </GsapMagnetic>
           <GsapMagnetic>
-            <button
-              onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-500/60 hover:text-red-500 hover:bg-red-50 transition-all text-sm font-semibold"
-            >
-              <LogOut size={18} />
-              Sign Out
-            </button>
+            <div className="w-full">
+               <LogoutButton className="font-semibold text-red-500/60 hover:text-red-500 hover:bg-red-50" />
+            </div>
           </GsapMagnetic>
         </div>
       </aside>
@@ -128,3 +126,4 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+

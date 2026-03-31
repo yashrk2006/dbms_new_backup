@@ -9,23 +9,19 @@ import {
   FileText, 
   Zap, 
   User, 
-  LogOut,
   Menu,
   X,
-  ShieldCheck,
-  Globe,
-  Activity,
-  Cpu,
-  Terminal,
+  Shield,
   ChevronRight,
   UserCircle,
-  Shield
+  Terminal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
 import { LiquidProgressBar } from '@/components/ui/LiquidProgressBar';
 import GsapMagnetic from '@/components/ui/GsapMagnetic';
 import { supabase } from '@/lib/supabase';
+import { LogoutButton } from '@/components/auth/LogoutButton';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, subtitle: 'SECTION 01' },
@@ -62,11 +58,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return () => window.removeEventListener("scroll", handler);
   }, [pathname, router]);
-
-  async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push('/');
-  }
 
   if (!authorized) {
     return (
@@ -174,13 +165,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
              </p>
           </div>
           <GsapMagnetic>
-            <button 
-              className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl border border-red-500/20 text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all duration-500 group"
-              onClick={handleSignOut}
-            >
-              <LogOut className="size-5 transition-transform group-hover:-translate-x-1" />
-              <span className="text-[11px] font-black uppercase tracking-[3px]">Sign Out</span>
-            </button>
+            <div className="w-full">
+              <LogoutButton className="w-full justify-center py-4 rounded-2xl border border-red-500/20 text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all duration-500" />
+            </div>
           </GsapMagnetic>
         </div>
       </aside>
@@ -250,13 +237,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             <div className="mt-auto pb-12 pt-12">
-               <button 
-                className="w-full flex items-center justify-center gap-5 p-6 rounded-3xl bg-red-500/10 text-red-500 border border-red-500/20 font-black uppercase tracking-[4px] text-sm shadow-xl"
-                onClick={handleSignOut}
-              >
-                <LogOut size={24} />
-                Sign Out
-              </button>
+               <LogoutButton className="w-full justify-center p-6 rounded-3xl bg-red-500/10 text-red-500 border border-red-500/20 font-black uppercase tracking-[4px] text-sm shadow-xl" />
             </div>
           </motion.div>
         )}
@@ -290,13 +271,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               
               <div className="h-8 w-[1px] bg-slate-100" />
               
-              <button 
-                onClick={handleSignOut}
-                className="hidden md:flex items-center gap-3 px-5 py-2.5 rounded-xl bg-white border border-red-100 text-red-500 hover:bg-red-50 transition-all group"
-              >
-                <LogOut size={16} className="group-hover:-translate-x-1 transition-transform" />
-                <span className="text-[10px] font-black uppercase tracking-[3px]">Secure Logout</span>
-              </button>
+              <LogoutButton className="hidden md:flex bg-white border border-red-100 text-red-500 hover:bg-red-50" showText={false} />
            </div>
         </header>
 
@@ -310,3 +285,4 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   );
 }
+
