@@ -29,22 +29,22 @@ export const NeuralParticleField = () => {
       opacity: number;
       direction: 'h' | 'v';
 
-      constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
+      constructor(width: number, height: number) {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
         this.speed = 0.5 + Math.random() * 2;
         this.size = 1 + Math.random() * 2;
         this.opacity = 0.1 + Math.random() * 0.4;
         this.direction = Math.random() > 0.5 ? 'h' : 'v';
       }
 
-      update() {
+      update(width: number, height: number) {
         if (this.direction === 'h') {
           this.x += this.speed;
-          if (this.x > canvas.width) this.x = 0;
+          if (this.x > width) this.x = 0;
         } else {
           this.y += this.speed;
-          if (this.y > canvas.height) this.y = 0;
+          if (this.y > height) this.y = 0;
         }
       }
 
@@ -62,13 +62,13 @@ export const NeuralParticleField = () => {
     }
 
     const init = () => {
-      particles = Array.from({ length: 50 }, () => new Particle());
+      particles = Array.from({ length: 50 }, () => new Particle(canvas.width, canvas.height));
     };
 
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       particles.forEach((p) => {
-        p.update();
+        p.update(canvas.width, canvas.height);
         p.draw();
       });
       animationFrameId = requestAnimationFrame(animate);
