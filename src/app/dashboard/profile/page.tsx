@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import PremiumCard from '@/components/ui/PremiumCard';
 import AnimatedSection from '@/components/ui/AnimatedSection';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 
 interface ProfileState {
   name: string;
