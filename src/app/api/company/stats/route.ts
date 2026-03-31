@@ -111,7 +111,8 @@ export async function GET(request: Request) {
         activeRoles: internships.length,
         totalApplicants: enrichedApplications.length,
         pendingReview: enrichedApplications.filter((a: any) => a.status === 'Pending').length,
-        interviewsScheduled: enrichedApplications.filter((a: any) => a.status === 'Interviewing').length
+        interviewsScheduled: enrichedApplications.filter((a: any) => a.status === 'Interviewing').length,
+        isVerified: company.is_verified
       },
       applications: enrichedApplications,
       talentDiscovery: talentPool

@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AnimatedSection from '@/components/ui/AnimatedSection';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 interface Application {
   application_id: number;
@@ -88,14 +90,17 @@ function PipelineTimeline({ status }: { status: string }) {
 }
 
 export default function ApplicationsPage() {
+  const router = useRouter();
   const [apps, setApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [withdrawingId, setWithdrawingId] = useState<number | null>(null);
 
   async function load() {
-    const userId = localStorage.getItem('demo_student_id');
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    
     if (!userId) {
-      setLoading(false);
+      router.push('/auth/login');
       return;
     }
 

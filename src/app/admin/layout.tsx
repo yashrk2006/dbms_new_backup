@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ReactNode, useEffect, useState } from 'react';
 import { LayoutDashboard, GraduationCap, Briefcase, ArrowLeft, Crown, LogOut, BarChart3, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 const navItems = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard },
@@ -16,23 +17,42 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const [authorized, setAuthorized] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const adminId = localStorage.getItem('demo_admin_id');
-    if (!adminId) {
-      router.push('/auth/login');
-      return;
+    async function checkAdmin() {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push('/auth/login');
+        return;
+      }
+
+      // Verify Administrative Privileges
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile?.role !== 'admin') {
+        router.push('/dashboard'); // Kick out non-admins to student dashboard
+        return;
+      }
+
+      setAuthorized(true);
+      setLoading(false);
     }
-    setAuthorized(true);
+    
+    checkAdmin();
   }, [router]);
 
   const handleSignOut = async () => {
-    localStorage.removeItem('demo_admin_id');
-    localStorage.removeItem('clerk_user_id');
+    await supabase.auth.signOut();
     router.push('/');
   };
 
-  if (!authorized) {
+  if (loading || !authorized) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-10 gap-8">
         <div className="size-20 rounded-3xl bg-amber-600/10 border border-amber-600/20 flex items-center justify-center text-amber-600 animate-pulse">

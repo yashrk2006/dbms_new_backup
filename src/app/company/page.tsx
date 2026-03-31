@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Application as IApplication, Student as IStudent, MarketEquilibriumItem } from '@/types';
 import { exportToCSV } from '@/lib/utils/export';
+import { supabase } from '@/lib/supabase';
 
 // Enriched application for the company view
 interface EnrichedCompanyApplication extends IApplication {
@@ -39,7 +40,7 @@ const statusColors: Record<string, { color: string; bg: string; border: string }
 
 export default function CompanyDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState({ activeRoles: 0, totalApplicants: 0, pendingReview: 0, interviewsScheduled: 0 });
+  const [stats, setStats] = useState({ activeRoles: 0, totalApplicants: 0, pendingReview: 0, interviewsScheduled: 0, isVerified: false });
   const [applications, setApplications] = useState<EnrichedCompanyApplication[]>([]);
   const [talentDiscovery, setTalentDiscovery] = useState<TalentDiscoveryProfile[]>([]);
   const [selectedApplication, setSelectedApplication] = useState<EnrichedCompanyApplication | null>(null);
@@ -47,7 +48,9 @@ export default function CompanyDashboard() {
 
   useEffect(() => {
     async function load() {
-      const storedId = localStorage.getItem('demo_company_id');
+      const { data: { session } } = await supabase.auth.getSession();
+      const storedId = session?.user?.id;
+      
       if (!storedId) {
         router.push('/auth/login');
         return;
@@ -101,11 +104,63 @@ export default function CompanyDashboard() {
           <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Talent Pipeline</h1>
           <p className="text-slate-500 font-medium tracking-tight">Manage role matchings and AI-driven candidate assessments.</p>
         </div>
-        <button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl flex items-center gap-3 shadow-lg shadow-emerald-600/20 transition-all font-black text-xs uppercase tracking-widest shrink-0">
-          <Plus size={18} />
-          Post New Role
-        </button>
+        <div className="relative group shrink-0">
+          <button 
+            disabled={!stats.isVerified}
+            className={`px-8 py-4 rounded-2xl flex items-center gap-3 transition-all font-black text-xs uppercase tracking-widest shadow-lg ${
+              stats.isVerified 
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 hover:-translate-y-0.5' 
+                : 'bg-slate-100 text-slate-400 cursor-not-allowed grayscale'
+            }`}
+          >
+            <Plus size={18} />
+            Post New Role
+          </button>
+          {!stats.isVerified && (
+            <div className="absolute top-full right-0 mt-3 p-3 bg-slate-900 text-white text-[10px] font-bold rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 border border-slate-800 shadow-2xl">
+              Verification Required
+            </div>
+          )}
+        </div>
       </header>
+
+      {!stats.isVerified && (
+        <motion.div 
+          initial={{ opacity: 0, y: 30, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="relative p-10 rounded-[3rem] bg-indigo-900 border border-indigo-500/30 overflow-hidden shadow-2xl shadow-indigo-900/40"
+        >
+          {/* Background Neural Detail */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.15),transparent)] pointer-events-none" />
+          <div className="absolute -top-20 -right-20 size-64 bg-emerald-500/10 blur-[100px] rounded-full" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+            <div className="size-20 rounded-[2rem] bg-white/10 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white shrink-0 group">
+              <Clock className="size-10 text-emerald-400 animate-pulse group-hover:scale-110 transition-transform" />
+            </div>
+            
+            <div className="flex-1 text-center md:text-left space-y-3">
+              <div className="flex items-center gap-3 justify-center md:justify-start">
+                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-500/30">
+                  Identity Pending
+                </span>
+              </div>
+              <h2 className="text-3xl font-black text-white tracking-tight uppercase leading-none">
+                Neural Verification in Progress
+              </h2>
+              <p className="text-indigo-200/70 font-medium max-w-2xl leading-relaxed text-sm">
+                Your corporate entity has been successfully registered. We are currently performing identity synthesis and administrative vetting. Recruitment tools will activate upon successful verification.
+              </p>
+            </div>
+
+            <div className="shrink-0 flex flex-col gap-4">
+              <button className="bg-white text-indigo-900 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-colors shadow-xl">
+                Synthesis Progress
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats Overview */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">

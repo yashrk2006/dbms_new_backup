@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AI_ENGINE } from '@/lib/ai-engine';
 import { toast } from 'react-hot-toast';
 import { NeuralCore3D } from '@/components/ui/NeuralCore3D';
+import { supabase } from '@/lib/supabase';
 
 export default function AIInterviewSimulator() {
   const router = useRouter();
@@ -27,9 +28,10 @@ export default function AIInterviewSimulator() {
 
   useEffect(() => {
     async function loadSession() {
-      // Mock loading application context
-      const storedUser = localStorage.getItem('demo_user_id');
-      if (!storedUser) {
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      
+      if (!userId) {
         router.push('/auth/login');
         return;
       }

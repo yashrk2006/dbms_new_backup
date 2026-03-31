@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AnimatedSection from '@/components/ui/AnimatedSection';
 import { toast } from 'react-hot-toast';
 import { AI_ENGINE } from '@/lib/ai-engine';
+import { supabase } from '@/lib/supabase';
 
 interface Internship {
   id: string;
@@ -51,19 +52,20 @@ export default function InternshipsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setNow(Date.now());
-    const storedUserId = localStorage.getItem('demo_student_id');
-    if (!storedUserId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) {
       router.push('/auth/login');
       return;
     }
     
     try {
-      const respStats = await fetch(`/api/dashboard/stats?userId=${storedUserId}`);
+      const respStats = await fetch(`/api/dashboard/stats?userId=${userId}`);
       const statsResult = await respStats.json();
       const currentSkills = statsResult.success ? statsResult.student.skills.map((s: any) => s.skill_name) : [];
       setMySkills(currentSkills);
 
-      const respInternships = await fetch(`/api/internships?userId=${storedUserId}&t=${Date.now()}`, { cache: 'no-store' });
+      const respInternships = await fetch(`/api/internships?userId=${userId}&t=${Date.now()}`, { cache: 'no-store' });
       const internshipsResult = await respInternships.json();
       
       if (internshipsResult.success) {
@@ -153,7 +155,12 @@ export default function InternshipsPage() {
     if (applying || internship.applied) return;
     
     setApplying(internship.id);
-    const userId = localStorage.getItem('demo_student_id');
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) {
+      toast.error("Authentication required for application.");
+      return;
+    }
     if (!userId) {
       toast.error('Session expired. Please login again.');
       router.push('/auth/login');

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AnimatedSection from '@/components/ui/AnimatedSection';
+import { supabase } from '@/lib/supabase';
 
 interface Skill { skill_id: number; skill_name: string; category?: string; }
 interface StudentSkill { skill_id: number; skill_name: string; proficiency_level: string; category?: string; }
@@ -36,9 +37,12 @@ export default function SkillsPage() {
   const [aiInsights, setAiInsights] = useState<{ marketReach: number, nextBestSkill: any } | null>(null);
 
   const load = useCallback(async () => {
-    const storedUserId = localStorage.getItem('demo_student_id');
+    const { data: { session } } = await supabase.auth.getSession();
+    const storedUserId = session?.user?.id;
+    
     if (!storedUserId) {
       setLoading(false);
+      router.push('/auth/login');
       return;
     }
     try {
@@ -81,9 +85,12 @@ export default function SkillsPage() {
   async function handleAddSkill() {
     if (!selectedSkillName) return;
     setAdding(true);
-    const storedUserId = localStorage.getItem('demo_student_id');
+    const { data: { session } } = await supabase.auth.getSession();
+    const storedUserId = session?.user?.id;
+    
     if (!storedUserId) {
       setAdding(false);
+      router.push('/auth/login');
       return;
     }
     try {
@@ -110,7 +117,8 @@ export default function SkillsPage() {
   }
 
   async function removeSkill(skillName: string) {
-    const storedUserId = localStorage.getItem('demo_student_id');
+    const { data: { session } } = await supabase.auth.getSession();
+    const storedUserId = session?.user?.id;
     if (!storedUserId) return;
     try {
       const response = await fetch('/api/skills', {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   User, School, GraduationCap, FileText, Save, CheckCircle2,
   AlertCircle, Camera, Activity, Cpu, ShieldCheck, Link as LinkIcon,
@@ -9,6 +10,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import PremiumCard from '@/components/ui/PremiumCard';
 import AnimatedSection from '@/components/ui/AnimatedSection';
+import { supabase } from '@/lib/supabase';
 
 interface ProfileState {
   name: string;
@@ -26,6 +28,7 @@ interface CompletionStep {
 }
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileState>({ name: '', college: '', branch: '', graduation_year: '', resume_url: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,9 +38,12 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function load() {
-      const userId = localStorage.getItem('demo_student_id');
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      
       if (!userId) {
         setLoading(false);
+        router.push('/auth/login');
         return;
       }
 
@@ -90,8 +96,10 @@ export default function ProfilePage() {
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const userId = localStorage.getItem('demo_student_id');
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
     if (!userId) {
+      toast.error("Interactive session required.");
       setSaving(false);
       return;
     }

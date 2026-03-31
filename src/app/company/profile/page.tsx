@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import AnimatedSection from '@/components/ui/AnimatedSection';
+import { supabase } from '@/lib/supabase';
 
 interface CompanyProfile {
   name: string;
@@ -30,7 +31,8 @@ export default function CompanyProfilePage() {
 
   useEffect(() => {
     async function load() {
-      const companyId = localStorage.getItem('demo_company_id');
+      const { data: { session } } = await supabase.auth.getSession();
+      const companyId = session?.user?.id;
       if (!companyId) return;
 
       try {
@@ -51,7 +53,9 @@ export default function CompanyProfilePage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    const companyId = localStorage.getItem('demo_company_id');
+    const { data: { session } } = await supabase.auth.getSession();
+    const companyId = session?.user?.id;
+    if (!companyId) return;
 
     try {
       const res = await fetch('/api/company/profile', {

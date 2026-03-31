@@ -54,6 +54,7 @@ export function ThreeDCard({ children, className = "" }: ThreeDCardProps) {
         transformStyle: "preserve-3d",
       }}
       className={`relative transition-all duration-200 ease-linear ${className}`}
+      suppressHydrationWarning
     >
       <div
         style={{
@@ -61,6 +62,7 @@ export function ThreeDCard({ children, className = "" }: ThreeDCardProps) {
           transformStyle: "preserve-3d",
         }}
         className="size-full"
+        suppressHydrationWarning
       >
         {children}
       </div>

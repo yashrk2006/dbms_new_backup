@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Briefcase, Plus, X, MapPin, Calendar, IndianRupee, Users, Trash2, TrendingUp, CheckCircle2, BarChart3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 
 interface Posting {
   internship_id: number;
@@ -28,9 +30,12 @@ export default function JobPostings() {
 
   useEffect(() => {
     async function fetchPostings() {
-      const storedId = localStorage.getItem('demo_company_id');
+      const { data: { session } } = await supabase.auth.getSession();
+      const storedId = session?.user?.id;
+      
       if (!storedId) {
         setLoading(false);
+        router.push('/auth/login');
         return;
       }
       setCompanyId(storedId);

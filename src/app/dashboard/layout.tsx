@@ -25,6 +25,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
 import { LiquidProgressBar } from '@/components/ui/LiquidProgressBar';
 import GsapMagnetic from '@/components/ui/GsapMagnetic';
+import { supabase } from '@/lib/supabase';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, subtitle: 'SECTION 01' },
@@ -40,26 +41,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [authorized, setAuthorized] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handler, { passive: true });
     
-    const studentId = localStorage.getItem('demo_student_id');
-    if (!studentId) {
-      router.push('/auth/login');
-      return;
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push('/auth/login');
+        return;
+      }
+      setUser(session.user);
+      setAuthorized(true);
     }
-    setAuthorized(true);
+    
+    checkAuth();
 
     return () => window.removeEventListener("scroll", handler);
   }, [pathname, router]);
 
   async function handleSignOut() {
-    // Premium Logout Sequence: Clear all intelligence caches
-    localStorage.removeItem('demo_student_id');
-    localStorage.removeItem('demo_company_id');
-    localStorage.removeItem('demo_admin_id');
+    await supabase.auth.signOut();
     router.push('/');
   }
 
@@ -271,8 +276,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
            <div className="flex items-center gap-6">
               <Link href="/dashboard/profile" className="flex items-center gap-3 group">
                   <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-black uppercase tracking-[2px] text-slate-900 group-hover:text-amber-600 transition-colors">Arjun Sharma</span>
-                      <span className="text-[8px] font-bold uppercase tracking-[1px] text-slate-400">Pro Member</span>
+                      <span className="text-[10px] font-black uppercase tracking-[2px] text-slate-900 group-hover:text-amber-600 transition-colors">
+                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Neural Link..."}
+                      </span>
+                      <span className="text-[8px] font-bold uppercase tracking-[1px] text-slate-400">Validated Node</span>
                   </div>
                   <div className="size-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden group-hover:border-amber-500 transition-all">
                       <div className="size-full bg-amber-600/10 flex items-center justify-center text-amber-600">

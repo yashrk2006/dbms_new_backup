@@ -17,6 +17,15 @@ DROP TABLE IF EXISTS company CASCADE;
 DROP TABLE IF EXISTS admin CASCADE;
 DROP TABLE IF EXISTS student CASCADE;
 
+-- NEW: Decommission Shadow Tables (Legacy Plural/Capitalized conflicts)
+DROP TABLE IF EXISTS applications CASCADE;
+DROP TABLE IF EXISTS companies CASCADE;
+DROP TABLE IF EXISTS internships CASCADE;
+DROP TABLE IF EXISTS students CASCADE;
+DROP TABLE IF EXISTS skills CASCADE;
+DROP TABLE IF EXISTS student_skills CASCADE;
+DROP TABLE IF EXISTS internship_skills CASCADE;
+
 -- Clean up leftover Supabase starter template artifacts causing integer/uuid conflicts
 DROP TABLE IF EXISTS public.profiles CASCADE;
 DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
@@ -29,7 +38,8 @@ CREATE TABLE IF NOT EXISTS student (
     college VARCHAR(255),
     branch VARCHAR(255),
     graduation_year INT,
-    resume_url TEXT
+    resume_url TEXT,
+    is_active BOOLEAN DEFAULT true
 );
 
 CREATE TABLE IF NOT EXISTS company (
@@ -37,7 +47,8 @@ CREATE TABLE IF NOT EXISTS company (
     company_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     industry VARCHAR(255),
-    location VARCHAR(255)
+    location VARCHAR(255),
+    is_verified BOOLEAN DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS admin (

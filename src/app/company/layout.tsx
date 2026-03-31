@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
 import { LiquidProgressBar } from '@/components/ui/LiquidProgressBar';
 import GsapMagnetic from '@/components/ui/GsapMagnetic';
+import { supabase } from '@/lib/supabase';
 
 const navItems = [
   { href: '/company', label: 'Company Overview', icon: LayoutDashboard },
@@ -22,15 +23,18 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function initSession() {
-      const storedId = localStorage.getItem('demo_company_id');
-      if (!storedId) {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
         router.push('/auth/login');
         return;
       }
+      
+      const userId = session.user.id;
       setAuthorized(true);
       
       try {
-        const res = await fetch(`/api/company/profile?companyId=${storedId}`);
+        const res = await fetch(`/api/company/profile?companyId=${userId}`);
         const data = await res.json();
         if (data.success) {
           setCompanyName(data.company.name);
@@ -43,6 +47,11 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
     }
     initSession();
   }, [router]);
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push('/');
+  }
 
   if (!authorized) {
     return (
@@ -57,12 +66,6 @@ export default function CompanyLayout({ children }: { children: ReactNode }) {
       </div>
     );
   }
-
-  const handleSignOut = async () => {
-    localStorage.removeItem('demo_company_id');
-    localStorage.removeItem('clerk_user_id');
-    router.push('/');
-  };
 
   return (
     <div className="flex min-h-screen bg-slate-50 relative overflow-x-hidden">

@@ -23,6 +23,7 @@ const statusConfig: Record<string, { color: string; bg: string; border: string; 
 };
 
 import { Student, Application } from '@/types';
+import { supabase } from '@/lib/supabase';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -38,7 +39,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const userId = localStorage.getItem('demo_student_id');
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      
       if (!userId) {
         router.push('/auth/login');
         return;

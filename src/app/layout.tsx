@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Public_Sans, DM_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
-import { Toaster } from 'react-hot-toast';
+import { ToasterProvider } from "@/components/providers/ToasterProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -44,15 +44,7 @@ export default function RootLayout({
           <div className="fixed inset-0 pointer-events-none border border-border/5 z-20" suppressHydrationWarning />
 
           <div className="relative z-10" suppressHydrationWarning>
-            <Toaster 
-              position="top-right"
-              toastOptions={{
-                className: 'bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest border border-white/10 rounded-2xl p-4 shadow-2xl',
-                success: {
-                  iconTheme: { primary: '#10b981', secondary: '#fff' }
-                }
-              }}
-            />
+            <ToasterProvider />
             {children}
           </div>
         </ThemeProvider>

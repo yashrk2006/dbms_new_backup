@@ -38,11 +38,11 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="bg-slate-50 pt-24 pb-12 border-t border-slate-200 relative overflow-hidden">
+    <footer className="bg-slate-50 pt-24 pb-12 border-t border-slate-200 relative overflow-hidden" suppressHydrationWarning>
       {/* Immersive Background Elements */}
-      <div className="absolute inset-0 bg-mesh-gradient opacity-10 pointer-events-none" />
-      <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-linear-to-r from-transparent via-primary/20 to-transparent" />
+      <div className="absolute inset-0 bg-mesh-gradient opacity-10 pointer-events-none" suppressHydrationWarning />
+      <div className="absolute inset-0 bg-grid-pattern opacity-5 pointer-events-none" suppressHydrationWarning />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-px bg-linear-to-r from-transparent via-primary/20 to-transparent" suppressHydrationWarning />
       
       <div className="max-w-7xl mx-auto px-8 grid grid-cols-2 md:grid-cols-5 gap-16 mb-20 relative z-10">
         {/* Brand / Identity Section */}

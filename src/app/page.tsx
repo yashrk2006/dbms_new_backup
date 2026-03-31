@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { 
   Zap, 
   ShieldCheck, 
@@ -17,7 +17,8 @@ import {
   Database,
   Layers,
   Sparkles,
-  Command
+  Command,
+  Box
 } from "lucide-react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
@@ -28,7 +29,13 @@ import { ThreeDCard } from "@/components/ui/ThreeDCard";
 import { NeuralArchitectureHUD } from "@/components/ui/NeuralArchitectureHUD";
 
 export default function LandingPage() {
+  const [mounted, setMounted] = useState(false);
   const scrollRef = useRef(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const { scrollYProgress } = useScroll({
     target: scrollRef,
     offset: ["start end", "end start"]
@@ -59,7 +66,7 @@ export default function LandingPage() {
     {
       title: "3D Visual Engines",
       description: "Immersive Web interfaces powered by Three.js and high-frequency motion logic.",
-      icon: <BoxIcon className="size-6" />,
+      icon: <Box className="size-6" />,
       subtitle: "MASTER_03"
     },
     {
@@ -99,13 +106,13 @@ export default function LandingPage() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen selection:bg-amber-500/30 text-slate-900 bg-white selection:text-white">
+    <div className="flex flex-col min-h-screen selection:bg-amber-500/30 text-slate-900 bg-white selection:text-white" suppressHydrationWarning>
       <Navbar />
       
       {/* 3D NEURAL OVERLAY (HUD) - Refined Range & Z-Index Focus */}
-      <NeuralArchitectureHUD progress={scrollYProgress} range={[0.15, 0.4]} />
+      {mounted && <NeuralArchitectureHUD progress={scrollYProgress} range={[0.15, 0.4]} />}
 
-      <main className="flex-grow pt-32">
+      <main className="flex-grow pt-32" suppressHydrationWarning>
         {/* --- 3D HERO SECTION --- */}
         <section className="relative min-h-[110vh] flex flex-col items-center justify-center px-6 overflow-hidden perspective-[2000px]">
           <div className="absolute inset-0 pointer-events-none">
@@ -167,7 +174,7 @@ export default function LandingPage() {
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
                 <Link
-                  href="/dashboard"
+                  href="/auth/signup"
                   className="w-full sm:w-auto px-20 py-8 rounded-[2.5rem] bg-slate-950 text-white text-[11px] font-black uppercase tracking-[0.6em] shadow-[0_45px_90px_-20px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all flex items-center justify-center gap-6 group"
                 >
                   Join the Network
@@ -497,7 +504,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
                <Link
-                 href="/dashboard"
+                 href="/auth/signup"
                  className="px-20 py-8 rounded-[2.5rem] bg-slate-950 text-white text-xs font-black uppercase tracking-[0.6em] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all inline-flex items-center gap-6 group"
                >
                  Initialize Sync

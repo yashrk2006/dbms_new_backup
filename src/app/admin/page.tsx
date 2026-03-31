@@ -11,6 +11,7 @@ import { MarketEquilibriumItem, Skill } from '@/types';
 import { ThreeDCard } from '@/components/ui/ThreeDCard';
 import { AI_ENGINE } from '@/lib/ai-engine';
 import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
 interface AtRiskStudent {
   student_id: string;
@@ -32,7 +33,9 @@ export default function AdminOverview() {
 
   useEffect(() => {
     async function load() {
-      const storedId = localStorage.getItem('demo_admin_id');
+      const { data: { session } } = await supabase.auth.getSession();
+      const storedId = session?.user?.id;
+      
       if (!storedId) {
         router.push('/auth/login');
         return;

@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { AI_ENGINE } from '@/lib/ai-engine';
 import { toast } from 'react-hot-toast';
+import { supabase } from '@/lib/supabase';
 
 type Status = 'All' | 'Pending' | 'Under Review' | 'Interviewing' | 'Accepted' | 'Rejected';
 
@@ -103,9 +104,12 @@ export default function ReviewCandidates() {
   useEffect(() => {
     setNow(Date.now());
     async function fetchCandidates() {
-      const storedId = localStorage.getItem('demo_company_id');
+      const { data: { session } } = await supabase.auth.getSession();
+      const storedId = session?.user?.id;
+      
       if (!storedId) {
         setLoading(false);
+        router.push('/auth/login');
         return;
       }
 

@@ -6,8 +6,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
+    // Security Gate: Verify session matches request
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id !== userId) {
+      return NextResponse.json({ success: false, error: 'Unauthorized Profile Access' }, { status: 403 });
     }
 
     const [studentRes, appCountRes, skillsCountRes] = await Promise.all([
@@ -46,6 +48,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { userId, profile } = await request.json();
+
+    // Security Gate: Verify session matches request
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id !== userId) {
+      return NextResponse.json({ success: false, error: 'Profile Modification Denied' }, { status: 403 });
+    }
 
     if (!userId || !profile) {
        return NextResponse.json({ success: false, error: 'Missing data' }, { status: 400 });

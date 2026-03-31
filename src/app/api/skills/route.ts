@@ -7,8 +7,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
-    if (!userId) {
-      return NextResponse.json({ success: false, error: 'User ID required' }, { status: 400 });
+    // Security Gate: Ensure users can only access their own profile
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id !== userId) {
+      return NextResponse.json({ success: false, error: 'Unauthorized Access Prohibited' }, { status: 403 });
     }
 
     // 1. Fetch Student Skills
@@ -67,6 +69,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { userId, skillName, proficiencyLevel, action } = await request.json();
+
+    // Security Gate: Ensure users can only modify their own data
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || user.id !== userId) {
+      return NextResponse.json({ success: false, error: 'Write Access Denied' }, { status: 403 });
+    }
 
     if (!userId || !skillName) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });

@@ -5,7 +5,10 @@ import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Zap, Menu, X, Globe, ShieldCheck, LogOut } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
 export default function Navbar() {
+  const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [session, setSession] = useState<any>(null);
@@ -14,45 +17,36 @@ export default function Navbar() {
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const handler = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", handler, { passive: true });
     
-    // Demo session synchronization
-    const checkSession = () => {
-      const studentId = localStorage.getItem('demo_student_id');
-      const companyId = localStorage.getItem('demo_company_id');
-      const adminId = localStorage.getItem('demo_admin_id');
-      
-      if (studentId) {
-        setSession({ user: { id: studentId, role: 'student' } });
-      } else if (companyId) {
-        setSession({ user: { id: companyId, role: 'company' } });
-      } else if (adminId) {
-        setSession({ user: { id: adminId, role: 'admin' } });
+    // Real-time Authentication Sync
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) {
+        // Fetch User Classification from Database
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+        
+        setSession({ user: { ...session.user, role: profile?.role || 'student' } });
       } else {
         setSession(null);
       }
-    };
-
-    checkSession();
-    // Re-check on storage events (multi-tab support)
-    window.addEventListener('storage', checkSession);
+    });
 
     return () => {
       window.removeEventListener("scroll", handler);
-      window.removeEventListener('storage', checkSession);
+      subscription.unsubscribe();
     };
   }, []);
 
   const handleLogout = async () => {
     try {
       setLoggingOut(true);
-      // Premium Logout Sequence: Clear all intelligence caches
-      localStorage.removeItem('demo_student_id');
-      localStorage.removeItem('demo_company_id');
-      localStorage.removeItem('demo_admin_id');
-      localStorage.removeItem('clerk_user_id'); 
-      
+      await supabase.auth.signOut();
       setSession(null);
       router.push('/auth/login');
       setMobileMenuOpen(false);
@@ -136,10 +130,11 @@ export default function Navbar() {
           ))}
           <div className="w-px h-4 bg-slate-200 mx-2" />
           <Link
-            href={session?.user?.role === 'company' ? '/company' : session?.user?.role === 'admin' ? '/admin' : '/dashboard'}
+            href={mounted && session?.user?.role === 'company' ? '/company' : mounted && session?.user?.role === 'admin' ? '/admin' : '/dashboard'}
             className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[3px] transition-all group ${
               pathname.startsWith('/dashboard') || pathname.startsWith('/company') || pathname.startsWith('/admin') ? "text-amber-600" : "text-slate-500 hover:text-amber-600"
             }`}
+            suppressHydrationWarning
           >
             <ShieldCheck size={14} className={pathname.startsWith('/dashboard') || pathname.startsWith('/company') || pathname.startsWith('/admin') ? "" : "group-hover:scale-110 transition-transform"} />
             Dashboard
@@ -147,8 +142,8 @@ export default function Navbar() {
         </div>
 
         {/* Right Actions */}
-        <div className="flex items-center gap-6">
-          {session ? (
+        <div className="flex items-center gap-6" suppressHydrationWarning>
+          {mounted && session ? (
             <button
               onClick={handleLogout}
               disabled={loggingOut}
@@ -162,6 +157,7 @@ export default function Navbar() {
               <Link
                 href="/auth/login"
                 className="hidden md:block text-[10px] font-black uppercase tracking-[3px] text-slate-600 hover:text-amber-600 transition-colors"
+                suppressHydrationWarning
               >
                 Portal Login
               </Link>
@@ -169,6 +165,7 @@ export default function Navbar() {
               <Link
                 href="/auth/login"
                 className="px-8 py-3.5 rounded-xl bg-amber-600 text-white text-[10px] font-black uppercase tracking-[3px] shadow-lg shadow-amber-600/10 transition-all relative overflow-hidden group border border-amber-500 hidden sm:block hover:bg-amber-500 hover:shadow-xl active:scale-95"
+                suppressHydrationWarning
               >
                 <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                 <span className="relative z-10 font-bold">Initialize</span>
