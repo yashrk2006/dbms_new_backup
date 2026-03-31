@@ -48,6 +48,9 @@ CREATE INDEX IF NOT EXISTS idx_otp_logs_email ON otp_logs(email);
 
 -- 5. RLS (Row Level Security) - Admin only for the directory
 ALTER TABLE college_directory ENABLE ROW LEVEL SECURITY;
+
+-- FORCE REFRESH POLICY: Clears "policy already exists" error
+DROP POLICY IF EXISTS "admin_full_access" ON college_directory;
 CREATE POLICY "admin_full_access" ON college_directory FOR ALL USING (auth.jwt() ->> 'role' = 'service_role' OR auth.jwt() ->> 'role' = 'admin');
 
 -- 6. Permissions
