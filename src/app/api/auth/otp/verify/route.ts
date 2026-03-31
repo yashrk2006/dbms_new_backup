@@ -54,6 +54,14 @@ export async function POST(request: Request) {
     }
 
     // 3. DIRECT SQL IDENTITY DISCOVERY
+    if (!process.env.DATABASE_URL) {
+      console.error('❌ Missing DATABASE_URL in Vercel Environment');
+      return NextResponse.json({ 
+        error: 'Database configuration missing in Vercel',
+        diagnostic: 'Check Vercel Environment Variables: DATABASE_URL is undefined.'
+      }, { status: 500 });
+    }
+
     const pgClient = new pg.Client({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false }
@@ -69,16 +77,15 @@ export async function POST(request: Request) {
       }
     } catch (pgErr: any) {
       console.error('❌ Direct SQL Bypass Failed:', pgErr.message);
+      // NOTE: We don't return 500 here yet, as createUser might still work if user doesn't exist
     } finally {
       await pgClient.end();
     }
 
     // 4. IDENTITY HARDENING & PASS-HANDSHAKE
-    // We generate a secure temporary password that the client will use for this session
     const syncPassword = Math.random().toString(36).slice(-20) + 'Aa1!';
     
     if (!authUser) {
-      // Create new user with forced metadata
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password: syncPassword,
@@ -87,12 +94,15 @@ export async function POST(request: Request) {
       });
 
       if (createError) {
-        console.error('❌ Auth Creation Error:', createError);
-        return NextResponse.json({ error: 'Failed to create secure identity' }, { status: 500 });
+        console.error('❌ Auth Creation Error:', createError.message);
+        return NextResponse.json({ 
+          error: 'Failed to create institutional identity',
+          details: createError.message,
+          code: createError.status 
+        }, { status: 500 });
       }
       authUser = newUser.user;
     } else {
-      // UPGRADE EXISTING USER: Inject role/roll_no and set sync password
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
         password: syncPassword,
         user_metadata: { 
@@ -103,7 +113,11 @@ export async function POST(request: Request) {
 
       if (updateError) {
         console.error('❌ Identity Hardening Error:', updateError.message);
-        return NextResponse.json({ error: 'Failed to authorize institutional role' }, { status: 500 });
+        return NextResponse.json({ 
+          error: 'Failed to authorize institutional role',
+          details: updateError.message,
+          code: updateError.status
+        }, { status: 500 });
       }
     }
 
