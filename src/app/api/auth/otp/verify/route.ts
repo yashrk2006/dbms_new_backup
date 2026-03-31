@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+// @ts-expect-error - Handled via @types/pg for local but Vercel may be strict
 import pg from 'pg';
 
 /**
