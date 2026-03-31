@@ -78,10 +78,15 @@ export async function POST(request: Request) {
       await pgClient.end();
     } catch (pgErr: any) {
       console.error('❌ Direct SQL Bypass Failed:', pgErr.message);
+      
+      const isDnsError = pgErr.code === 'ENOTFOUND' || pgErr.message?.includes('ENOTFOUND');
+      
       return NextResponse.json({ 
-        error: 'Database connection failed in production',
+        error: isDnsError ? 'Database Identity DNS Blocked' : 'Database connection failed in production',
         details: pgErr.message,
-        diagnostic: 'Ensure DATABASE_URL in Vercel includes ?sslmode=require and uses the Transaction Pooler (Port 6543).'
+        diagnostic: isDnsError 
+          ? 'CRITICAL: Port 5432 (Direct) is failing DNS on Vercel. Switch DATABASE_URL in Vercel to Port 6543 (Pooler) and add ?sslmode=require.'
+          : 'Ensure DATABASE_URL in Vercel includes ?sslmode=require and uses the Transaction Pooler (Port 6543).'
       }, { status: 500 });
     }
 
