@@ -75,11 +75,14 @@ export async function POST(request: Request) {
         authUser = { id: rows[0].id, email: rows[0].email };
         console.log('✅ Identity Discovered via Postgres Bypass:', authUser.id);
       }
+      await pgClient.end();
     } catch (pgErr: any) {
       console.error('❌ Direct SQL Bypass Failed:', pgErr.message);
-      // NOTE: We don't return 500 here yet, as createUser might still work if user doesn't exist
-    } finally {
-      await pgClient.end();
+      return NextResponse.json({ 
+        error: 'Database connection failed in production',
+        details: pgErr.message,
+        diagnostic: 'Ensure DATABASE_URL in Vercel includes ?sslmode=require and uses the Transaction Pooler (Port 6543).'
+      }, { status: 500 });
     }
 
     // 4. IDENTITY HARDENING & PASS-HANDSHAKE
