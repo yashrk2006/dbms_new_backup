@@ -35,6 +35,7 @@ interface Candidate {
     college: string;
     branch: string;
     graduation_year: number | string;
+    roll_no?: string;
     skills?: { skill_name: string; proficiency: string }[];
   } | null;
   internship: {
@@ -290,7 +291,7 @@ export default function ReviewCandidates() {
                                 )}
                               </div>
                               <div className="text-[10px] text-slate-400 font-medium">{c.student?.email}</div>
-                              <div className="text-[10px] text-slate-400">{c.student?.college} · Class of {c.student?.graduation_year}</div>
+                              <div className="text-[10px] text-slate-400">ID: {c.student?.roll_no || 'N/A'} · {c.student?.college}</div>
                             </div>
                           </div>
                         </td>

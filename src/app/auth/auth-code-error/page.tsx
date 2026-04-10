@@ -29,7 +29,7 @@ export default function AuthCodeError() {
 
         <div className="space-y-4">
           <button
-            onClick={() => router.push('/auth/signup')}
+            onClick={() => router.push('/auth/login')}
             className="w-full py-5 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-[3px] text-[10px] hover:bg-slate-800 transition-all flex items-center justify-center gap-3"
           >
             <RefreshCcw size={16} />

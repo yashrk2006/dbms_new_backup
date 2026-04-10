@@ -23,6 +23,7 @@ export default function JobPostings() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [isVerified, setIsVerified] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({ title: '', description: '', duration: '', location: '', stipend: '', skills: '' });
@@ -41,13 +42,21 @@ export default function JobPostings() {
       setCompanyId(storedId);
 
       try {
-        const res = await fetch(`/api/company/internships?companyId=${storedId}`);
-        const data = await res.json();
-        if (data.success) {
-          setPostings(data.data || []);
+        const [internRes, companyRes] = await Promise.all([
+          fetch(`/api/company/internships?companyId=${storedId}`),
+          supabase.from('company').select('is_verified').eq('company_id', storedId).single()
+        ]);
+        
+        const internData = await internRes.json();
+        if (internData.success) {
+          setPostings(internData.data || []);
+        }
+
+        if (companyRes.data) {
+          setIsVerified(companyRes.data.is_verified);
         }
       } catch (e) {
-        console.error('Failed to fetch postings:', e);
+        console.error('Failed to fetch data:', e);
       } finally {
         setLoading(false);
       }
@@ -108,8 +117,14 @@ export default function JobPostings() {
           <p className="text-slate-500 font-medium mt-1">Manage and publish new internship opportunities.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
-          className="bg-amber-600 hover:bg-amber-700 text-white px-7 py-3.5 rounded-2xl font-black text-sm tracking-[3px] uppercase shadow-lg shadow-amber-600/20 active:scale-95 transition-all flex items-center gap-3"
+          onClick={() => {
+            if (!isVerified) {
+              toast.error("Organization verification pending. Access restricted.", { icon: "🔒" });
+              return;
+            }
+            setIsModalOpen(true);
+          }}
+          className={`${isVerified ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20' : 'bg-slate-400 cursor-not-allowed opacity-70'} text-white px-7 py-3.5 rounded-2xl font-black text-sm tracking-[3px] uppercase shadow-lg active:scale-95 transition-all flex items-center gap-3`}
         >
           <Plus size={18} />
           New Posting

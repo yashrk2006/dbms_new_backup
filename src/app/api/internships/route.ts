@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       .select(`
         *,
         company(company_name),
-        internship_requirements(skill(skill_name))
+        internship_skill(skill(skill_name))
       `);
 
     if (error) throw error;
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
         .eq('student_id', userId);
       
       if (userApps) {
-        appliedIds = new Set(userApps.map(a => a.internship_id));
+        appliedIds = new Set(userApps.map((a: any) => a.internship_id));
       }
     }
 
@@ -38,8 +38,9 @@ export async function GET(request: Request) {
       id: i.internship_id.toString(),
       company_name: i.company?.company_name || 'Independent',
       requirements: {
-          role_skills: i.internship_requirements?.map((ir: any) => ir.skill.skill_name) || []
+          role_skills: i.internship_skill?.map((ir: any) => ir.skill.skill_name) || []
       },
+      required_skills: i.internship_skill?.map((ir: any) => ir.skill.skill_name) || [],
       applied: appliedIds.has(i.internship_id)
     }));
 

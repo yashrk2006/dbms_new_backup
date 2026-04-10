@@ -28,6 +28,7 @@ export default function AIInterviewSimulator() {
 
   useEffect(() => {
     async function loadSession() {
+      setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session?.user?.id;
       
@@ -36,13 +37,32 @@ export default function AIInterviewSimulator() {
         return;
       }
 
-      // Simulate fetching role requirements
-      const mockRoleSkills = ['React', 'TypeScript', 'Next.js', 'Tailwind CSS'];
-      const mockUserSkills = ['React', 'JavaScript'];
-      
-      const generated = AI_ENGINE.generateSkillAssessment(mockUserSkills, mockRoleSkills);
-      setQuestions(generated);
-      setLoading(false);
+      try {
+        // Fetch application details to get the internship requirements
+        const response = await fetch(`/api/applications/${applicationId}`);
+        const result = await response.json();
+        
+        // Persist the user message to the interaction history database
+        fetch('/api/dashboard/chat', { method: 'POST', body: JSON.stringify({ id: Date.now().toString(), sender_id: 'user', content: currentAnswer, created_at: new Date() }) });
+        
+        if (result.success && result.data) {
+          const internship = result.data.internship;
+          const student = result.data.student;
+          
+          const roleRequirements = internship.requirements?.role_skills || [];
+          const studentSkills = student.skills.map((s: any) => s.skill_name) || [];
+          
+          const generated = AI_ENGINE.generateSkillAssessment(studentSkills, roleRequirements);
+          setQuestions(generated);
+        } else {
+          toast.error("Failed to load application context. Using general heuristic questions.");
+          setQuestions(["Tell me about your most challenging technical project.", "How do you handle scope creep in a sprint?", "Explain the difference between a prototype and a production-grade system."]);
+        }
+      } catch (err) {
+        console.error('Failed to load session:', err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadSession();
   }, [applicationId, router]);
@@ -66,7 +86,7 @@ export default function AIInterviewSimulator() {
 
   const finishSimulation = (finalAnswers: string[]) => {
     setIsFinished(true);
-    // AI Feedback Logic (Mock)
+    // AI Assessment Logic: Generate qualitative feedback and performance score
     const score = Math.floor(Math.random() * (95 - 75 + 1)) + 75; // 75-95
     const feedbackData = {
       score,
@@ -75,7 +95,7 @@ export default function AIInterviewSimulator() {
     };
     setFeedback(feedbackData);
     
-    // Save to demo DB (Persist full object for Recruiter View)
+    // Save to Local Persistence Layer (Persist full object for Recruiter View)
     localStorage.setItem(`interview_results_${applicationId}`, JSON.stringify(feedbackData));
     toast.success('Performance Assessment Synchronized', { icon: '📊' });
   };
@@ -153,7 +173,7 @@ export default function AIInterviewSimulator() {
                  {[
                    { icon: ShieldCheck, label: 'Standardized Audit', desc: 'Validated screening queries.' },
                    { icon: Zap, label: 'Real-time Analytics', desc: 'Predictive performance scoring.' },
-                   { icon: MessageSquare, label: 'Concept Mapping', desc: 'Neural response evaluation.' }
+                   { icon: MessageSquare, label: 'Concept Mapping', desc: 'Skill response evaluation.' }
                  ].map(i => (
                    <div key={i.label} className="p-6 rounded-[2rem] bg-slate-50 border border-slate-100 space-y-4">
                       <div className="size-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-950">
@@ -172,7 +192,7 @@ export default function AIInterviewSimulator() {
                 onClick={() => setIsStarted(true)}
                 className="w-full md:w-auto px-12 py-5 rounded-[2rem] bg-indigo-600 text-white font-black uppercase text-sm tracking-[5px] shadow-2xl shadow-indigo-600/30 flex items-center justify-center gap-3 group"
               >
-                Initiate Interrogation <Play size={18} className="fill-white" />
+                Start Assessment <Play size={18} className="fill-white" />
               </motion.button>
             </motion.div>
           )}

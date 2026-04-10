@@ -25,11 +25,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AnimatedSection from '@/components/ui/AnimatedSection';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
 
 interface Application {
   application_id: number;
   applied_date: string;
   status: 'Pending' | 'Under Review' | 'Interviewing' | 'Accepted' | 'Rejected';
+  ai_match_score: number;
   internship: {
     title: string;
     duration: string | null;
@@ -105,7 +107,7 @@ export default function ApplicationsPage() {
     }
 
     try {
-      const res = await fetch(`/api/applications?userId=${userId}`);
+      const res = await fetch(`/api/application-submit?userId=${userId}`);
       const data = await res.json();
       if (data.success) {
         setApps(data.data || []);
@@ -120,18 +122,44 @@ export default function ApplicationsPage() {
   useEffect(() => { load(); }, []);
 
   async function withdrawApplication(application_id: number) {
-    if (!confirm('Withdraw this application? This cannot be undone.')) return;
+    const isConfirmed = await new Promise<boolean>((resolve) => {
+      const toastId = toast(
+        (t) => (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-bold text-slate-900 font-sans">Withdraw this application?</p>
+            <p className="text-xs text-slate-500 font-sans">This operation is permanent and cannot be undone.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { toast.dismiss(toastId); resolve(true); }}
+                className="px-4 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-wider rounded-xl shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+              >Confirm Withdrawal</button>
+              <button
+                onClick={() => { toast.dismiss(toastId); resolve(false); }}
+                className="px-4 py-2 bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-wider rounded-xl active:scale-95 transition-all"
+              >Cancel</button>
+            </div>
+          </div>
+        ),
+        { duration: 8000 }
+      );
+    });
+
+    if (!isConfirmed) return;
+    
     setWithdrawingId(application_id);
     try {
-      const res = await fetch(`/api/applications?applicationId=${application_id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/application-submit?applicationId=${application_id}`, { method: 'DELETE' });
       const data = await res.json();
+      
       if (data.success) {
         setApps(prev => prev.filter(a => a.application_id !== application_id));
+        toast.success('Application request retracted successfully.', { icon: '🗑️' });
       } else {
-        alert(data.error || 'Failed to withdraw application');
+        toast.error(data.error || 'System failed to process withdrawal.');
       }
     } catch (e) {
-      console.error('Withdraw error:', e);
+      console.error('Withdraw rejection error:', e);
+      toast.error('Network identity lost. Check connectivity.');
     } finally {
       setWithdrawingId(null);
     }
@@ -240,6 +268,10 @@ export default function ApplicationsPage() {
                               <div className="flex items-center gap-3">
                                  <div className="size-1.5 rounded-full bg-amber-500/30" />
                                  <span className="text-[11px] font-bold uppercase tracking-[3px] text-slate-400">{app.internship?.company?.company_name ?? 'Company'}</span>
+                                 <div className="ml-4 px-3 py-1 rounded-full bg-black text-white text-[9px] font-black tracking-widest flex items-center gap-2">
+                                    <Zap size={10} className="text-amber-400 fill-amber-400" />
+                                    {app.ai_match_score || 0}% AI MATCH
+                                 </div>
                               </div>
                             </div>
 

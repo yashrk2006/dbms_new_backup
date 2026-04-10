@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 import { AI_ENGINE } from '@/lib/ai-engine';
 import { Application as IApplication, Student as IStudent, Internship as IInternship, Skill } from '@/types';
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Company ID required' }, { status: 400 });
     }
 
-    // 1. Fetch Company Data
+    // 1. Fetch Company Data (Using supabaseAdmin to bypass RLS)
     const { data: company, error: companyError } = await supabase
       .from('company')
       .select('*')
@@ -26,26 +26,29 @@ export async function GET(request: Request) {
     // 2. Fetch Company Internships with Requirements
     const { data: internshipsRaw, error: internError } = await (supabase
       .from('internship')
-      .select('*, internship_requirements(skill(skill_name))') as any)
+      .select('*, internship_skill(skill(skill_name))') as any)
       .eq('company_id', companyId);
 
     const internships: IInternship[] = (internshipsRaw || []).map((i: any) => ({
       id: i.internship_id.toString(),
       title: i.title,
+      type: i.internship_type || 'Remote',
+      openings: i.openings || 1,
+      deadline: i.deadline,
+      perks: i.perks,
       requirements: {
-          role_skills: i.internship_requirements?.map((ir: any) => ir.skill.skill_name) || []
+          role_skills: i.internship_skill?.map((ir: any) => ir.skill.skill_name) || []
       }
     } as any));
 
     // 3. Fetch Applications for the company with student info
-    // Filtering by internship_id is the reactive approach for high-fidelity data integrity.
-    const internshipIds = internships.map(i => parseInt(i.id));
+    const internshipIds = internships.map((i: any) => i.id);
     const { data: filteredAppsRaw } = await (supabase
       .from('application')
       .select(`
         *,
-        student(student_id, name, student_skill(skill(skill_name))),
-        internship(internship_id, title)
+        student(student_id, name, roll_no, student_skill(skill(skill_name)), ai_resume_analysis, resume_url),
+        internship(internship_id, title, internship_type)
       `) as any)
       .in('internship_id', internshipIds);
 
@@ -62,17 +65,23 @@ export async function GET(request: Request) {
         status: app.status,
         applied_date: app.applied_date,
         student_name: app.student?.name || 'Unknown',
+        student_roll_no: app.student?.roll_no || 'N/A',
+        student_skills: studentSkills,
         role_title: app.internship?.title || 'Unknown Role',
+        internship_type: app.internship?.internship_type || 'Remote',
         match_score: matchScore,
-        ai_interview_guide: interviewQuestions
+        ai_interview_guide: interviewQuestions,
+        resume_analysis: {
+          ...(app.student?.ai_resume_analysis || {}),
+          resume_url: app.student?.resume_url
+        }
       };
     });
 
     // 4. Talent Discovery: Find top students not yet applied
-    // Fetch all students and their skills
     const { data: allStudentsRaw } = await (supabase
       .from('student')
-      .select('student_id, name, student_skill(skill(skill_name))') as any);
+      .select('student_id, name, student_skill(skill(skill_name)), ai_resume_analysis') as any);
 
     const appliedStudentIds = new Set(enrichedApplications.map((a: any) => a.student_id));
     
@@ -94,6 +103,7 @@ export async function GET(request: Request) {
           id: s.student_id,
           name: s.name,
           skills: studentSkills,
+          resume_score: s.ai_resume_analysis?.score || 0,
           top_match: bestMatch ? {
             roleId: bestMatch.roleId,
             role: bestMatch.title,
@@ -114,6 +124,7 @@ export async function GET(request: Request) {
         interviewsScheduled: enrichedApplications.filter((a: any) => a.status === 'Interviewing').length,
         isVerified: company.is_verified
       },
+      internships,
       applications: enrichedApplications,
       talentDiscovery: talentPool
     });

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { 
   User, School, GraduationCap, FileText, Save, CheckCircle2,
   AlertCircle, Camera, Activity, Cpu, ShieldCheck, Link as LinkIcon,
-  TrendingUp, Zap, BookOpen, Award
+  TrendingUp, Zap, BookOpen, Award, Upload, Terminal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PremiumCard from '@/components/ui/PremiumCard';
@@ -15,10 +15,13 @@ import { toast } from 'react-hot-toast';
 
 interface ProfileState {
   name: string;
+  roll_no: string;
   college: string;
   branch: string;
   graduation_year: string;
   resume_url: string;
+  bio: string;
+  email: string;
 }
 
 interface CompletionStep {
@@ -30,10 +33,55 @@ interface CompletionStep {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<ProfileState>({ name: '', college: '', branch: '', graduation_year: '', resume_url: '' });
+  const [profile, setProfile] = useState<ProfileState>({
+    name: '', roll_no: '', college: '', branch: '', graduation_year: '', resume_url: '', bio: '', email: ''
+  });
+  const [skills, setSkills] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+       toast.error("Cloud Governance: Only PDF resumes supported.");
+       return;
+    }
+
+    setUploading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const studentId = session?.user?.id;
+
+    if (!studentId) {
+      toast.error("Auth session expired.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('studentId', studentId);
+
+    try {
+      const res = await fetch('/api/upload/resume', {
+        method: 'POST',
+        body: formData
+      });
+      const result = await res.json();
+      if (result.success) {
+        setProfile(prev => ({ ...prev, resume_url: result.url }));
+        toast.success("Resume provisioned to storage vault.");
+      } else {
+        toast.error(result.error || "Upload failed.");
+      }
+    } catch (err) {
+      toast.error("Upload service unavailable.");
+    } finally {
+      setUploading(false);
+    }
+  };
   const [skillCount, setSkillCount] = useState(0);
   const [appCount, setAppCount] = useState(0);
 
@@ -41,30 +89,35 @@ export default function ProfilePage() {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession();
       const userId = session?.user?.id;
-      
       if (!userId) {
         setLoading(false);
-        router.push('/auth/login');
-        return;
+        return; // Redirect handled by layout
       }
 
       try {
         const res = await fetch(`/api/students/profile?userId=${userId}`);
+        if (!res.headers.get('content-type')?.includes('application/json')) throw new Error('Bad response');
         const data = await res.json();
         if (data.success) {
           const student = data.data.profile;
           setProfile({
             name: student.name || '',
+            roll_no: student.roll_no || '',
             college: student.college || '',
             branch: student.branch || '',
             graduation_year: student.graduation_year?.toString() || '',
-            resume_url: student.resume_url || ''
+            resume_url: student.resume_url || '',
+            bio: student.bio || '',
+            email: student.email || ''
           });
           setSkillCount(data.data.stats.skills || 0);
           setAppCount(data.data.stats.applications || 0);
+        } else {
+          toast.error('Could not load profile: ' + (data.error || 'Unknown error'));
         }
       } catch (e) {
         console.error('Failed to load profile:', e);
+        toast.error('Failed to connect to profile service.');
       } finally {
         setLoading(false);
       }
@@ -100,7 +153,7 @@ export default function ProfilePage() {
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
     if (!userId) {
-      toast.error("Interactive session required.");
+      toast.error("Interactive session identity required for modification.");
       setSaving(false);
       return;
     }
@@ -111,13 +164,18 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, profile })
       });
+      if (!res.headers.get('content-type')?.includes('application/json')) throw new Error('Bad response');
       const data = await res.json();
       if (data.success) {
         setSaved(true);
+        toast.success('Profile saved successfully!');
         setTimeout(() => setSaved(false), 2500);
+      } else {
+        toast.error(data.error || 'Failed to save profile');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to save profile:', e);
+      toast.error('Could not save profile. Check your connection.');
     } finally {
       setSaving(false);
     }
@@ -144,44 +202,42 @@ export default function ProfilePage() {
 
       {/* Hero Banner */}
       <AnimatedSection direction="up" distance={40}>
-        <div className="relative h-52 rounded-[2.5rem] bg-white border border-slate-100 overflow-hidden shadow-sm flex items-end p-8 md:p-12 group">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-50/60 via-transparent to-slate-50/40 pointer-events-none" />
-          <div className="relative z-10 flex flex-col md:flex-row items-center md:items-end gap-8 w-full">
+        <div className="relative h-64 rounded-[4rem] bg-white border border-slate-100 overflow-hidden shadow-premium flex items-end p-12 md:p-14 group">
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 via-transparent to-slate-50 opacity-40 pointer-events-none" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full -mr-32 -mt-32 pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-center md:items-end gap-10 w-full">
             <div className="relative group/avatar">
-               <div className="size-28 rounded-[2rem] bg-amber-50 border-4 border-white flex items-center justify-center text-amber-600 shadow-xl group-hover:scale-105 transition-transform duration-500 relative overflow-hidden">
-                  <span className="text-5xl font-black tracking-widest text-amber-600/30">{profile.name ? profile.name.charAt(0).toUpperCase() : 'S'}</span>
+               <div className="size-36 rounded-[3rem] bg-white border-[6px] border-white flex items-center justify-center text-amber-600 shadow-2xl group-hover:scale-105 transition-all duration-700 relative overflow-hidden ring-1 ring-slate-100">
+                  <span className="text-6xl font-black tracking-tighter text-amber-500/20 select-none">{profile.name ? profile.name.charAt(0).toUpperCase() : 'S'}</span>
+                  <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=f59e0b&color=fff&bold=true&size=256`} alt="Profile" className="absolute inset-0 size-full object-cover" />
                </div>
-               <div className="absolute inset-0 bg-amber-600/20 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center rounded-[2rem] cursor-pointer">
-                  <Camera size={20} className="text-white" />
+               <div className="absolute -bottom-2 -right-2 size-10 rounded-2xl bg-slate-950 border-4 border-white flex items-center justify-center text-white shadow-lg cursor-pointer hover:bg-amber-600 transition-colors">
+                  <Camera size={14} />
                </div>
             </div>
-            <div className="flex-1 text-center md:text-left">
-               <div className="flex items-center gap-2 mb-2">
-                  <ShieldCheck size={12} className="text-amber-600" />
-                  <span className="text-[9px] font-black uppercase tracking-[5px] text-amber-600">Profile Active</span>
+            <div className="flex-1 text-center md:text-left pb-2">
+               <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/10">
+                    <ShieldCheck size={12} className="text-amber-600" />
+                    <span className="text-[9px] font-black uppercase tracking-[3px] text-amber-700">Verified Identity</span>
+                  </div>
                </div>
-               <h1 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tighter uppercase leading-[0.85]">
+               <h1 className="text-5xl md:text-7xl font-black text-slate-950 tracking-tighter uppercase leading-[0.8]">
                  {profile.name || 'Anonymous'}<br />
-                 <span className="text-amber-600">Professional.</span>
+                 <span className="text-amber-600 opacity-80">Sync Interface.</span>
                </h1>
-               <div className="flex flex-wrap gap-3 mt-4">
-                 {profile.college && (
-                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-100 text-[9px] font-bold uppercase tracking-[2px] text-slate-500 shadow-sm">
-                     <School size={10} className="text-amber-600" />{profile.college}
-                   </div>
-                 )}
-                 {profile.branch && (
-                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-100 text-[9px] font-bold uppercase tracking-[2px] text-slate-500 shadow-sm">
-                     <Cpu size={10} className="text-amber-600" />{profile.branch}
-                   </div>
-                 )}
-               </div>
             </div>
-            {/* Completion badge top-right */}
-            <div className="hidden md:flex flex-col items-end gap-1">
-               <span className="text-[8px] font-black uppercase tracking-[4px] text-slate-400">Completion</span>
-               <span className={`text-4xl font-black tracking-tighter ${completionColor}`}>{completionPct}%</span>
-               <span className="text-[8px] text-slate-300 uppercase font-bold tracking-widest">{completedCount}/{completionSteps.length} steps done</span>
+
+            <div className="hidden md:flex flex-col items-end gap-2 pb-2">
+               <div className="flex items-center gap-2">
+                 <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                 <span className="text-[10px] font-black uppercase tracking-[4px] text-slate-400">Optimization Matrix</span>
+               </div>
+               <div className="flex items-baseline gap-2">
+                 <span className={`text-6xl font-black tracking-tighter leading-none ${completionColor}`}>{completionPct}%</span>
+               </div>
+               <span className="text-[9px] text-slate-400 uppercase font-black tracking-[2px]">{completedCount}/{completionSteps.length} Nodes Synchronized</span>
             </div>
           </div>
         </div>
@@ -194,40 +250,41 @@ export default function ProfilePage() {
 
           {/* Dynamic Profile Completion Widget */}
           <AnimatedSection direction="right">
-            <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-8 space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="size-9 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-                  <Activity size={16} />
+            <div className="bg-white/70 backdrop-blur-xl rounded-[3rem] border border-white/60 shadow-premium p-10 space-y-8 relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl -mr-10 -mt-10" />
+              <div className="flex items-center gap-4 relative z-10">
+                <div className="size-12 rounded-2xl bg-amber-500/10 border border-amber-500/10 flex items-center justify-center text-amber-600 shadow-inner">
+                  <Activity size={20} />
                 </div>
                 <div>
-                  <div className="text-[9px] font-black uppercase tracking-[4px] text-slate-400">Profile Strength</div>
-                  <div className={`text-2xl font-black tracking-tighter ${completionColor}`}>{completionPct}% Complete</div>
+                  <div className="text-[10px] font-black uppercase tracking-[4px] text-slate-400">Capability Sync</div>
+                  <div className={`text-3xl font-black tracking-tighter ${completionColor}`}>{completionPct}% Profile</div>
                 </div>
               </div>
 
               {/* Progress bar */}
-              <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner relative z-10">
                 <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${completionPct}%` }}
-                  transition={{ duration: 0.9, ease: 'circOut' }}
-                  className={`h-full rounded-full shadow-sm ${completionBarColor}`}
+                   initial={{ width: 0 }}
+                   animate={{ width: `${completionPct}%` }}
+                   transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+                   className={`h-full rounded-full shadow-lg ${completionBarColor}`}
                 />
               </div>
 
               {/* Checklist */}
-              <div className="space-y-3">
+              <div className="space-y-4 relative z-10">
                 {completionSteps.map((step) => (
-                  <div key={step.label} className={`flex items-start gap-3 p-3 rounded-xl transition-all ${step.done ? 'bg-emerald-50 border border-emerald-100' : 'bg-slate-50 border border-slate-100 hover:border-amber-100'}`}>
-                    <div className={`size-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${step.done ? 'bg-emerald-100 text-emerald-600' : 'bg-white border border-slate-200 text-slate-300'}`}>
-                      {step.done ? <CheckCircle2 size={13} /> : <step.icon size={12} />}
+                  <div key={step.label} className={`flex items-start gap-4 p-4 rounded-2xl transition-all duration-500 ${step.done ? 'bg-emerald-500/5 border border-emerald-500/10' : 'bg-slate-50/50 border border-slate-100 hover:border-amber-500/20'}`}>
+                    <div className={`size-8 rounded-xl flex items-center justify-center shrink-0 ${step.done ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-slate-200 text-slate-300'}`}>
+                      {step.done ? <CheckCircle2 size={14} /> : <step.icon size={14} />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className={`text-[10px] font-black uppercase tracking-[2px] ${step.done ? 'text-emerald-700 line-through opacity-60' : 'text-slate-700'}`}>
+                      <div className={`text-[11px] font-black uppercase tracking-[2px] ${step.done ? 'text-emerald-700 opacity-60' : 'text-slate-700'}`}>
                         {step.label}
                       </div>
                       {!step.done && (
-                        <div className="text-[9px] font-medium text-slate-400 mt-0.5 leading-relaxed">{step.hint}</div>
+                        <div className="text-[10px] font-medium text-slate-400 mt-1 leading-relaxed">{step.hint}</div>
                       )}
                     </div>
                   </div>
@@ -236,23 +293,24 @@ export default function ProfilePage() {
 
               {/* Recruiter boost message */}
               {completionPct < 100 && (
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <TrendingUp size={12} className="text-amber-600" />
-                    <span className="text-[9px] font-black uppercase tracking-[3px] text-amber-700">Visibility Boost</span>
-                  </div>
-                  <p className="text-[9px] font-medium text-amber-800/70 leading-relaxed">
-                    Complete all steps to boost recruiter visibility by <span className="font-black text-amber-700">240%</span> and unlock Top Candidate status.
-                  </p>
-                </div>
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-100">
+              <div className="flex items-center gap-2 mb-1.5">
+              <TrendingUp size={12} className="text-amber-600" />
+              <span className="text-[9px] font-black uppercase tracking-[3px] text-amber-700">Visibility Boost</span>
+              </div>
+              <p className="text-[9px] font-medium text-amber-800/70 leading-relaxed">
+              Complete all steps to boost recruiter visibility by <span className="font-black text-amber-700">240%</span> and unlock Top Candidate status.
+              </p>
+              </div>
               )}
 
               {completionPct === 100 && (
-                <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3">
-                  <ShieldCheck size={20} className="text-emerald-600 shrink-0" />
-                  <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[2px]">Profile fully optimised — you are a Top Candidate!</p>
-                </div>
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center gap-3">
+              <ShieldCheck size={20} className="text-emerald-600 shrink-0" />
+              <p className="text-[10px] font-black text-emerald-700 uppercase tracking-[2px]">Profile fully optimised — you are a Top Candidate!</p>
+              </div>
               )}
+
             </div>
           </AnimatedSection>
 
@@ -303,6 +361,19 @@ export default function ProfilePage() {
                     />
                   </div>
 
+                  {/* Roll Number (Official ID) */}
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-amber-600 uppercase tracking-[3px] flex items-center gap-2">
+                      <ShieldCheck size={11} /> Institutional ID (Roll No)
+                    </label>
+                    <input 
+                      type="text" value={profile.roll_no}
+                      onChange={e => setProfile(p => ({ ...p, roll_no: e.target.value }))}
+                      placeholder="e.g. 24/70001"
+                      className="w-full h-14 px-5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-900 tracking-wider focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/40 transition-all placeholder:text-slate-300 outline-none"
+                    />
+                  </div>
+
                   {/* Graduation Year */}
                   <div className="space-y-2">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-[3px] flex items-center gap-2">
@@ -341,23 +412,85 @@ export default function ProfilePage() {
                       className="w-full h-14 px-5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-900 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/40 transition-all placeholder:text-slate-300 outline-none"
                     />
                   </div>
+
+                  {/* Bio / Professional Summary */}
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-[3px] flex items-center gap-2">
+                      <Activity size={11} /> Professional Summary / Bio
+                    </label>
+                    <textarea 
+                      value={profile.bio}
+                      onChange={e => setProfile(p => ({ ...p, bio: e.target.value }))}
+                      placeholder="A short summary of your professional background, goals, and expertise..."
+                      className="w-full h-32 p-5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-medium text-slate-900 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/40 transition-all placeholder:text-slate-300 outline-none resize-none"
+                    />
+                  </div>
                 </div>
 
-                {/* Resume URL */}
-                <div className="space-y-2">
+                {/* Resume Upload Capability */}
+                <div className="space-y-4">
                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-[3px] flex items-center gap-2">
-                    <LinkIcon size={11} /> Portfolio / Resume Link
+                    <Terminal size={11} /> Resume Document / Portfolio
                   </label>
-                  <div className="relative">
-                    <input 
-                      type="url" value={profile.resume_url}
-                      onChange={e => setProfile(p => ({ ...p, resume_url: e.target.value }))}
-                      placeholder="https://drive.google.com/file/d/..."
-                      className="w-full h-14 pl-5 pr-14 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-900 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500/40 transition-all placeholder:text-slate-300 outline-none"
-                    />
-                    <FileText size={18} className="absolute right-5 top-4 text-slate-300" />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div 
+                      className="relative h-24 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-2 group hover:border-amber-500/50 hover:bg-amber-50/10 transition-all cursor-pointer overflow-hidden"
+                      onClick={() => document.getElementById('cv-upload')?.click()}
+                    >
+                      <input 
+                        id="cv-upload" type="file" accept=".pdf" 
+                        className="hidden" onChange={handleFileUpload} 
+                      />
+                      {uploading ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <Cpu size={24} className="text-amber-600 animate-spin" />
+                          <span className="text-[8px] font-black uppercase tracking-widest text-amber-600">Uploading...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload size={24} className="text-slate-300 group-hover:text-amber-600 transition-colors" />
+                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Click to Upload PDF</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="bg-white p-5 rounded-2xl border border-slate-100 flex items-center justify-between group">
+                      <div className="flex items-center gap-4">
+                        <div className="size-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-lg group-hover:bg-amber-600 transition-colors">
+                          <FileText size={18} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <span className="text-[9px] font-black text-slate-900 uppercase tracking-tight block">CV Metadata</span>
+                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate max-w-[120px]">
+                            {profile.resume_url ? 'Linked to Vault' : 'No document linked'}
+                          </span>
+                        </div>
+                      </div>
+                      {profile.resume_url && (
+                        <button 
+                          type="button"
+                          onClick={() => window.open(profile.resume_url, '_blank')}
+                          className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-amber-600 hover:border-amber-600/30 transition-all"
+                        >
+                          <LinkIcon size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-[9px] text-slate-300 font-bold uppercase tracking-[2px]">Supported: Google Drive · GitHub · Notion · Portfolio sites</p>
+                  
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 space-y-2">
+                       <label className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Manual URL Override</label>
+                       <input 
+                        type="url" value={profile.resume_url}
+                        onChange={e => setProfile(p => ({ ...p, resume_url: e.target.value }))}
+                        placeholder="https://drive.google.com/..."
+                        className="w-full h-12 px-5 rounded-xl border border-slate-100 bg-slate-100/50 text-xs font-bold text-slate-500 focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500/20 transition-all placeholder:text-slate-300 outline-none"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-slate-300 font-bold uppercase tracking-[2px]">Cloud Storage: Resumes are encrypted and stored in private vaults.</p>
                 </div>
 
                 {/* Save Button */}

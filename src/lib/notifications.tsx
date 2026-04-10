@@ -1,89 +1,177 @@
 import { Resend } from 'resend';
+import * as React from 'react';
+import { supabaseAdmin } from '@/lib/supabase';
 import { ApplicationReceivedEmail } from '@/components/emails/ApplicationReceived';
 import { StatusUpdateEmail } from '@/components/emails/StatusUpdateEmail';
-import * as React from 'react';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
- * Global Notification Service for SkillSync.
- * Handles email delivery via Resend with professional React templates.
+ * Persist notification to the SkillSync repository for in-app visibility.
  */
-export const NotificationService = {
-  /**
-   * Send a professional email notification.
-   */
-  async sendEmail({
-    to,
-    subject,
-    react,
-  }: {
-    to: string | string[];
-    subject: string;
-    react: React.ReactNode;
-  }) {
-    if (!process.env.RESEND_API_KEY) {
-      console.warn('⚠️ RESEND_API_KEY is missing. Notification skipped:', { to, subject });
-      return { success: false, error: 'Missing API Key' };
-    }
-
-    try {
-      const { data, error } = await resend.emails.send({
-        from: 'SkillSync <onboarding@resend.dev>', // Verified domain required for production
-        to,
-        subject,
-        react: react as any,
+export async function persistNotification({
+  userId,
+  title,
+  message,
+  type = 'system'
+}: {
+  userId: string;
+  title: string;
+  message: string;
+  type?: string;
+}) {
+  try {
+    const { error } = await supabaseAdmin
+      .from('notification')
+      .insert({
+        user_id: userId,
+        title,
+        message,
+        type,
+        is_read: false
       });
-
-      if (error) {
-        console.error('❌ Resend Error:', error);
-        return { success: false, error };
-      }
-
-      return { success: true, data };
-    } catch (error) {
-      console.error('❌ Notification service crash:', error);
+    
+    if (error) {
+      console.error('❌ Database notification failed:', error);
       return { success: false, error };
     }
-  },
-
-  /**
-   * Notify student that their application was successfully received.
-   */
-  async notifyApplicationReceived(studentEmail: string, studentName: string, internshipTitle: string) {
-    return this.sendEmail({
-      to: studentEmail,
-      subject: `Application Received: ${internshipTitle}`,
-      react: <ApplicationReceivedEmail studentName={studentName} internshipTitle={internshipTitle} />,
-    });
-  },
-
-  /**
-   * Notify company about a high-potential new applicant.
-   */
-  async notifyCompanyNewApplicant(companyEmail: string, studentName: string, internshipTitle: string) {
-    // We can reuse a generic template or create a specific one for recruiters
-    return this.sendEmail({
-      to: companyEmail,
-      subject: `New Candidate: ${studentName} applied for ${internshipTitle}`,
-      react: (
-        <div>
-          <h3>New Application for {internshipTitle}</h3>
-          <p>Candidate <strong>{studentName}</strong> has just applied. Visit your portal to view their AI Match Score and profile details.</p>
-        </div>
-      ),
-    });
-  },
-
-  /**
-   * Notify student of a progression in their application journey.
-   */
-  async notifyStatusUpdate(studentEmail: string, studentName: string, internshipTitle: string, newStatus: string) {
-    return this.sendEmail({
-      to: studentEmail,
-      subject: `SkillSync: Status update for ${internshipTitle}`,
-      react: <StatusUpdateEmail studentName={studentName} internshipTitle={internshipTitle} newStatus={newStatus} />,
-    });
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Notification persistence crash:', error);
+    return { success: false, error };
   }
-};
+}
 
+/**
+ * Send a professional email notification via Resend.
+ */
+export async function sendEmail({
+  to,
+  subject,
+  react,
+}: {
+  to: string | string[];
+  subject: string;
+  react: React.ReactNode;
+}) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn('⚠️ RESEND_API_KEY is missing. Notification skipped:', { to, subject });
+    return { success: false, error: 'Missing API Key' };
+  }
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: 'SkillSync <recruitment@booth-iq.com>', 
+      to,
+      subject,
+      react: react as any,
+    });
+
+    if (error) {
+      console.error('❌ Resend Error:', error);
+      return { success: false, error };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('❌ Notification service crash:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Notify student that their application was successfully received.
+ */
+export async function notifyApplicationReceived(studentId: string, studentEmail: string, studentName: string, internshipTitle: string) {
+  await persistNotification({
+    userId: studentId,
+    title: 'Application Received',
+    message: `Your application for "${internshipTitle}" has been logged in the intelligence pipeline.`,
+    type: 'application'
+  });
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `[SkillSync] Application Received: ${internshipTitle}`,
+    react: <ApplicationReceivedEmail studentName={studentName} internshipTitle={internshipTitle} />,
+  });
+}
+
+/**
+ * Notify company about a high-potential new applicant.
+ */
+export async function notifyCompanyNewApplicant(companyEmail: string, studentName: string, internshipTitle: string) {
+  return sendEmail({
+    to: companyEmail,
+    subject: `[New Applicant] ${studentName} applied for ${internshipTitle}`,
+    react: (
+      <div style={{ fontFamily: 'Inter, sans-serif' }}>
+        <h3>New Talent Discovery</h3>
+        <p>Candidate <strong>{studentName}</strong> has just applied for <strong>{internshipTitle}</strong>.</p>
+        <p>Visit your dashboard to view their AI Match Score and recruitment profile.</p>
+      </div>
+    ),
+  });
+}
+
+/**
+ * Notify student of a progression in their application journey.
+ */
+export async function notifyStatusUpdate(studentId: string, studentEmail: string, studentName: string, internshipTitle: string, newStatus: string) {
+  await persistNotification({
+    userId: studentId,
+    title: 'Application Status Updated',
+    message: `Your application for "${internshipTitle}" has been updated to: ${newStatus}`,
+    type: 'status'
+  });
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `[Update] Application status for ${internshipTitle}`,
+    react: <StatusUpdateEmail studentName={studentName} internshipTitle={internshipTitle} newStatus={newStatus} />,
+  });
+}
+
+/**
+ * Notify student that they have been invited to apply or interview.
+ */
+export async function notifyInvitation(studentId: string, studentEmail: string, studentName: string, internshipTitle: string, companyName: string) {
+  await persistNotification({
+    userId: studentId,
+    title: 'Recruitment Invitation',
+    message: `${companyName} has invited you to apply for their "${internshipTitle}" program!`,
+    type: 'invitation'
+  });
+
+  return sendEmail({
+    to: studentEmail,
+    subject: `[Exclusive] ${companyName} Invitation: ${internshipTitle}`,
+    react: (
+      <div style={{ fontFamily: 'Inter, sans-serif' }}>
+        <h1>Talent Discovery Invitation</h1>
+        <p>Hello {studentName},</p>
+        <p>You have been identified as a high-potential candidate by <strong>{companyName}</strong>.</p>
+        <p>They would like to invite you to apply for their <strong>{internshipTitle}</strong> program.</p>
+        <p>Check your SkillSync dashboard for more details and to accept this invitation.</p>
+      </div>
+    ),
+  });
+}
+
+/**
+ * Send a free-form custom message to a student.
+ */
+export async function sendCustomNotification(email: string, subject: string, message: string) {
+  return sendEmail({
+    to: email,
+    subject: subject,
+    react: (
+      <div style={{ fontFamily: 'Inter, sans-serif' }}>
+        <h3>SkillSync Administrative Update</h3>
+        <p>{message}</p>
+      </div>
+    ),
+  });
+}
+
+// No legacy object export - Use named imports for better stability and tree-shaking.

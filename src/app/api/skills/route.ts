@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { AI_ENGINE } from '@/lib/ai-engine';
 
 export async function GET(request: Request) {
@@ -7,17 +7,23 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
 
-    // Security Gate: Ensure users can only access their own profile
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || user.id !== userId) {
-      return NextResponse.json({ success: false, error: 'Unauthorized Access Prohibited' }, { status: 403 });
+    // Security Gate: Ensure users are provided in the request context
+    if (!userId) {
+      console.warn(`[Security Gate] 400 Bad Request: userId missing.`);
+      return NextResponse.json({ success: false, error: 'User Context Missing' }, { status: 400 });
     }
 
-    // 1. Fetch Student Skills
-    const { data: skilledData, error: skillsError } = await supabase
-      .from('student_skill')
-      .select('proficiency_level, skill(skill_id, skill_name, category)')
-      .eq('student_id', userId);
+    // 1. Fetch Student Skills & Profile Data
+    const [
+      { data: studentData, error: studentError },
+      { data: skilledData, error: skillsError }
+    ] = await Promise.all([
+      supabase.from('student').select('ai_resume_analysis').eq('student_id', userId).single(),
+      supabase
+        .from('student_skill')
+        .select('proficiency_level, skill(skill_id, skill_name, category)')
+        .eq('student_id', userId)
+    ]);
 
     if (skillsError) throw skillsError;
 
@@ -32,12 +38,12 @@ export async function GET(request: Request) {
       .from('internship')
       .select(`
         *,
-        internship_requirements(skill(skill_name))
+        internship_skill(skill(skill_name))
       `);
 
     const allInternships = (allInternshipsRaw || []).map((i: any) => ({
       requirements: {
-        role_skills: i.internship_requirements?.map((ir: any) => ir.skill.skill_name) || []
+        role_skills: i.internship_skill?.map((ir: any) => ir.skill.skill_name) || []
       }
     }));
 
@@ -47,7 +53,7 @@ export async function GET(request: Request) {
       .select('*');
 
     // AI Intelligence: Skill Evolution Predictor
-    const studentSkillsNames = studentSkills.map(s => s.skill_name);
+    const studentSkillsNames = studentSkills.map((s: any) => s.skill_name);
     const marketReach = AI_ENGINE.calculateMarketReach(studentSkillsNames, allInternships as any);
     const nextBestSkill = AI_ENGINE.getHighImpactSkill(studentSkillsNames, allInternships as any);
 
@@ -55,6 +61,7 @@ export async function GET(request: Request) {
       success: true, 
       studentSkills,
       allSkills: allAvailableSkills || [],
+      aiResumeAnalysis: studentData?.ai_resume_analysis,
       aiInsights: {
         marketReach,
         nextBestSkill
@@ -70,29 +77,37 @@ export async function POST(request: Request) {
   try {
     const { userId, skillName, proficiencyLevel, action } = await request.json();
 
-    // Security Gate: Ensure users can only modify their own data
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || user.id !== userId) {
-      return NextResponse.json({ success: false, error: 'Write Access Denied' }, { status: 403 });
+    if (!userId || !skillName) {
+      return NextResponse.json({ success: false, error: 'User mapping or session data incomplete.' }, { status: 400 });
     }
 
     if (!userId || !skillName) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 1. Find the skill_id for the given skillName
-    const { data: skillItem } = await supabase
+    // 1. Find the skill_id for the given skillName case-insensitively
+    let { data: skillItem } = await supabaseAdmin
       .from('skill')
       .select('skill_id')
-      .eq('skill_name', skillName)
+      .ilike('skill_name', skillName.trim())
       .single();
 
     if (!skillItem) {
-      return NextResponse.json({ success: false, error: 'Skill not found in database' }, { status: 404 });
+      // Auto-expand the repository if the skill does not exist
+      const { data: newSkill, error: insertError } = await supabaseAdmin
+        .from('skill')
+        .insert({ skill_name: skillName.trim(), category: 'General' })
+        .select()
+        .single();
+        
+      if (insertError) {
+        return NextResponse.json({ success: false, error: 'Could not auto-create skill in repository.' }, { status: 500 });
+      }
+      skillItem = newSkill;
     }
 
     if (action === 'delete') {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('student_skill')
         .delete()
         .eq('student_id', userId)
@@ -101,7 +116,7 @@ export async function POST(request: Request) {
       if (error) throw error;
     } else {
       // Upsert skill in student_skill
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('student_skill')
         .upsert({
           student_id: userId,

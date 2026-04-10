@@ -8,13 +8,16 @@ import {
   MoreVertical, Calendar, TrendingUp, Target, Sparkles, Brain, Award, Star, Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Application as IApplication, Student as IStudent, MarketEquilibriumItem } from '@/types';
+import { Application as IApplication } from '@/types';
 import { exportToCSV } from '@/lib/utils/export';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'react-hot-toast';
 
 // Enriched application for the company view
 interface EnrichedCompanyApplication extends IApplication {
   student_name: string;
+  student_roll_no?: string;
+  student_skills: string[];
   role_title: string;
   match_score: number;
   ai_interview_guide: string[];
@@ -45,6 +48,8 @@ export default function CompanyDashboard() {
   const [talentDiscovery, setTalentDiscovery] = useState<TalentDiscoveryProfile[]>([]);
   const [selectedApplication, setSelectedApplication] = useState<EnrichedCompanyApplication | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isShortlisting, setIsShortlisting] = useState(false);
+  const [aiShortlist, setAiShortlist] = useState<any>(null);
 
   useEffect(() => {
     async function load() {
@@ -72,7 +77,59 @@ export default function CompanyDashboard() {
       }
     }
     load();
-  }, []);
+  }, [router]);
+
+  const handleStatusUpdate = async (appId: string, newStatus: string) => {
+    try {
+      const res = await fetch('/api/company/applications', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: appId, status: newStatus })
+      });
+      const result = await res.json();
+      if (result.success) {
+        setApplications(apps => apps.map(a => a.application_id === appId ? { ...a, status: newStatus as any } : a));
+        if (selectedApplication?.application_id === appId) {
+          setSelectedApplication(prev => prev ? { ...prev, status: newStatus as any } : null);
+        }
+        toast.success(`Application marked as ${newStatus}`, { icon: "✅" });
+      } else {
+        toast.error(result.error || "Failed to update status");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Network error updating status");
+    }
+  };
+
+  const handleAiShortlist = async () => {
+    if (applications.length === 0) return;
+    setIsShortlisting(true);
+    try {
+      const candidates = applications.map(app => ({ 
+        name: app.student_name, 
+        skills: app.student_skills || [] 
+      }));
+
+      // Use the description of the internship being viewed, or a general summary
+      const jobContext = applications[0]?.role_title || "Technical Position";
+      const jd = `Looking for top candidates for the ${jobContext} role. Focus on technical maturity, skill alignment, and architectural depth.`;
+
+      const res = await fetch('/api/recruiter/shortlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          jobDescription: jd,
+          candidates 
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAiShortlist(data.data);
+      }
+    } catch (e) { console.error(e); }
+    setIsShortlisting(false);
+  };
 
   const handleExport = () => {
     const exportData = applications.map(app => ({
@@ -107,6 +164,7 @@ export default function CompanyDashboard() {
         <div className="relative group shrink-0">
           <button 
             disabled={!stats.isVerified}
+            onClick={() => router.push('/company/postings')}
             className={`px-8 py-4 rounded-2xl flex items-center gap-3 transition-all font-black text-xs uppercase tracking-widest shadow-lg ${
               stats.isVerified 
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 hover:-translate-y-0.5' 
@@ -123,44 +181,6 @@ export default function CompanyDashboard() {
           )}
         </div>
       </header>
-
-      {!stats.isVerified && (
-        <motion.div 
-          initial={{ opacity: 0, y: 30, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="relative p-10 rounded-[3rem] bg-indigo-900 border border-indigo-500/30 overflow-hidden shadow-2xl shadow-indigo-900/40"
-        >
-          {/* Background Neural Detail */}
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.15),transparent)] pointer-events-none" />
-          <div className="absolute -top-20 -right-20 size-64 bg-emerald-500/10 blur-[100px] rounded-full" />
-          
-          <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
-            <div className="size-20 rounded-[2rem] bg-white/10 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white shrink-0 group">
-              <Clock className="size-10 text-emerald-400 animate-pulse group-hover:scale-110 transition-transform" />
-            </div>
-            
-            <div className="flex-1 text-center md:text-left space-y-3">
-              <div className="flex items-center gap-3 justify-center md:justify-start">
-                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-500/30">
-                  Identity Pending
-                </span>
-              </div>
-              <h2 className="text-3xl font-black text-white tracking-tight uppercase leading-none">
-                Neural Verification in Progress
-              </h2>
-              <p className="text-indigo-200/70 font-medium max-w-2xl leading-relaxed text-sm">
-                Your corporate entity has been successfully registered. We are currently performing identity synthesis and administrative vetting. Recruitment tools will activate upon successful verification.
-              </p>
-            </div>
-
-            <div className="shrink-0 flex flex-col gap-4">
-              <button className="bg-white text-indigo-900 px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-50 transition-colors shadow-xl">
-                Synthesis Progress
-              </button>
-            </div>
-          </div>
-        </motion.div>
-      )}
 
       {/* Stats Overview */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -189,11 +209,16 @@ export default function CompanyDashboard() {
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Active Candidates</h3>
             <div className="flex items-center gap-3">
+              <button 
+                onClick={handleAiShortlist} 
+                disabled={isShortlisting}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white flex items-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+              >
+                <Sparkles size={14} className={isShortlisting ? "animate-spin" : ""} /> {isShortlisting ? "Analyzing..." : "AI Shortlist"}
+              </button>
               <button onClick={handleExport} className="px-4 py-2 rounded-xl border border-slate-100 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 transition-all shadow-sm">
                 <Download size={14} /> Export CSV
               </button>
-              <button className="size-9 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400 hover:text-emerald-600 transition-colors"><Search size={16} /></button>
-              <button className="px-4 py-2 rounded-xl border border-slate-100 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:border-emerald-600 transition-all"><Filter size={14} /> Filter</button>
             </div>
           </div>
 
@@ -211,7 +236,10 @@ export default function CompanyDashboard() {
                       {app.student_name ? app.student_name.charAt(0) : '?'}
                     </div>
                     <div>
-                      <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">{app.student_name}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-lg font-black text-slate-900 uppercase tracking-tight">{app.student_name}</h4>
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[8px] font-black text-slate-500 uppercase tracking-widest">{app.student_roll_no}</span>
+                      </div>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.role_title}</span>
                         <div className="size-1 rounded-full bg-slate-200" />
@@ -221,41 +249,62 @@ export default function CompanyDashboard() {
                   </div>
 
                   <div className="flex items-center gap-6">
-                    {/* Proactive Intelligence: Match Score Indicator */}
                     <div className="text-right">
                         <div className="flex items-center gap-2 justify-end">
                             <Brain size={12} className="text-indigo-500" />
-                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">AI Match Score</span>
+                            <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">AI Match</span>
                         </div>
                         <div className="text-2xl font-black text-slate-900 tracking-tighter">{app.match_score}%</div>
                     </div>
-                    <div className={`px-4 py-2 rounded-2xl border text-[9px] font-black uppercase tracking-[2px] ${statusColors[app.status]?.bg} ${statusColors[app.status]?.border} ${statusColors[app.status]?.color}`}>
+                    <div className={`px-4 py-2 rounded-2xl border text-[9px] font-black uppercase tracking-[2px] ${statusColors[app.status]?.bg || 'bg-slate-50'} ${statusColors[app.status]?.border || 'border-slate-100'} ${statusColors[app.status]?.color || 'text-slate-500'}`}>
                       {app.status}
                     </div>
                   </div>
                 </div>
               </motion.div>
             ))}
+
+            {applications.length === 0 && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center justify-center py-24 gap-8 border-2 border-dashed border-slate-100 rounded-[3rem] bg-slate-50/50"
+              >
+                <div className="size-20 rounded-[2rem] bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-200">
+                  <Users size={40} />
+                </div>
+                <div className="text-center space-y-2">
+                  <h3 className="text-xl font-black text-slate-700 uppercase tracking-tighter">No Applicants Yet</h3>
+                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-[3px] max-w-xs">
+                    Post your first role to start receiving AI-matched candidate profiles.
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push('/company/postings')}
+                  className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[4px] hover:bg-emerald-600 transition-all shadow-xl active:scale-95"
+                >
+                  + Post a Role
+                </button>
+              </motion.div>
+            )}
           </div>
         </div>
 
-        {/* AI Workspace Panel: Talent Discovery & Interview Guide */}
+
+        {/* AI Workspace Panel */}
         <div className="xl:col-span-4 space-y-8">
             <AnimatePresence mode="wait">
                 {selectedApplication ? (
                     <motion.div 
                         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-                        className="bg-slate-950 rounded-[3rem] p-10 text-white border border-white/5 relative overflow-hidden h-fit"
+                        className="bg-slate-950 rounded-[3rem] p-10 text-white border border-white/5 relative overflow-hidden h-fit shadow-2xl"
                     >
-                        <div className="absolute top-0 right-0 p-10 opacity-5">
-                            <MessageSquare size={120} className="text-emerald-500" />
-                        </div>
                         <div className="relative z-10 space-y-10">
                            <div className="flex items-center justify-between">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-3">
                                         <Sparkles size={14} className="text-emerald-500" />
-                                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[4px]">AI Interview Guide</span>
+                                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[4px]">AI Guide</span>
                                     </div>
                                     <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Candidate Assessment</h3>
                                 </div>
@@ -264,9 +313,9 @@ export default function CompanyDashboard() {
 
                            <div className="space-y-6">
                                 <div className="p-6 bg-white/5 rounded-2xl border border-white/10">
-                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Targeted Technical Evaluation</span>
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-4">Technical Evaluation Questions</span>
                                     <div className="space-y-5">
-                                        {(selectedApplication.ai_interview_guide || []).map((q: string, i: number) => (
+                                        {(selectedApplication.ai_interview_guide || ["Describe your React experience.", "How do you optimize API calls?", "Explain your CSS strategy."]).map((q: string, i: number) => (
                                             <div key={i} className="flex gap-4 group">
                                                 <span className="text-emerald-500 font-black text-xs leading-none">0{i+1}.</span>
                                                 <p className="text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">{q}</p>
@@ -275,9 +324,28 @@ export default function CompanyDashboard() {
                                     </div>
                                 </div>
 
+                                <div className="flex gap-2">
+                                    <button 
+                                      onClick={() => (selectedApplication as any).resume_analysis?.resume_url ? window.open((selectedApplication as any).resume_analysis.resume_url, '_blank') : toast.error("Resume document not found")}
+                                      className="flex-1 py-4 bg-white/5 border border-white/10 rounded-2xl font-black text-[10px] uppercase tracking-[3px] text-white/70 hover:bg-white/10 transition-all flex items-center justify-center gap-2"
+                                    >
+                                      <Download size={14} /> View Resume
+                                    </button>
+                                </div>
+
                                 <div className="flex gap-3">
-                                    <button className="flex-1 py-4 bg-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-[3px] shadow-lg shadow-emerald-900/40 hover:bg-emerald-700 transition-all">Approve for Interview</button>
-                                    <button className="size-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white/50 hover:bg-white/10 transition-all"><XCircle size={20} /></button>
+                                    <button 
+                                      onClick={() => handleStatusUpdate(selectedApplication.application_id, 'Interviewing')}
+                                      className="flex-1 py-4 bg-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-[3px] shadow-lg shadow-emerald-900/40 hover:bg-emerald-700 transition-all active:scale-95"
+                                    >
+                                      Approve
+                                    </button>
+                                    <button 
+                                      onClick={() => handleStatusUpdate(selectedApplication.application_id, 'Rejected')}
+                                      className="size-14 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-white/50 hover:bg-red-900/40 hover:text-red-400 transition-all active:scale-95"
+                                    >
+                                      <XCircle size={20} />
+                                    </button>
                                 </div>
                            </div>
                         </div>
@@ -292,8 +360,8 @@ export default function CompanyDashboard() {
                                 <TrendingUp size={20} />
                             </div>
                             <div className="space-y-0.5">
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Talent Discovery</h3>
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[2px]">AI Recommended Profiles</p>
+                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Discovery</h3>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[2px]">AI Recommended</p>
                             </div>
                          </div>
 
@@ -303,26 +371,29 @@ export default function CompanyDashboard() {
                                     <div className="flex justify-between items-start mb-3">
                                         <div>
                                             <h4 className="font-black text-slate-900 text-sm uppercase tracking-tight">{talent.name}</h4>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Top Predictor Match: <span className="text-emerald-600">{talent.top_match.role}</span></span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Match: <span className="text-emerald-600">{talent.top_match.role}</span></span>
                                         </div>
                                         <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-100 text-emerald-600 rounded-lg">
                                             <Star size={10} className="fill-emerald-600" />
                                             <span className="text-[10px] font-black">{talent.top_match.score}%</span>
                                         </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {talent.skills.slice(0, 3).map((s: string) => (
-                                            <span key={s} className="text-[8px] font-black text-slate-500 bg-white border border-slate-100 px-2 py-0.5 rounded-md uppercase tracking-widest">{s}</span>
-                                        ))}
-                                    </div>
-                                    <button className="w-full mt-4 py-2 rounded-xl bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:bg-black">Invite to Apply</button>
+                                    <button 
+                                      onClick={async () => {
+                                        toast.promise(
+                                          fetch('/api/notifications', {
+                                            method: 'POST',
+                                            body: JSON.stringify({ userId: talent.id, title: "Internship Invitation", message: `You have been invited to apply for ${talent.top_match.role}` })
+                                          }),
+                                          { loading: 'Sending invite...', success: 'Candidate Invited!', error: 'Service Unavailable' }
+                                        );
+                                      }}
+                                      className="w-full mt-4 py-2 rounded-xl bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all shadow-lg hover:bg-black"
+                                    >
+                                      Invite
+                                    </button>
                                 </div>
                             ))}
-                         </div>
-
-                         <div className="mt-8 p-5 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center gap-4">
-                            <Brain size={24} className="text-indigo-600" />
-                            <p className="text-[10px] font-bold text-indigo-700 leading-relaxed uppercase tracking-tight">AI has scanned 500+ profiles to find these high-relevance matches for your open roles.</p>
                          </div>
                     </motion.div>
                 )}

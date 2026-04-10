@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS student_skill (
     PRIMARY KEY (student_id, skill_id)
 );
 
-CREATE TABLE IF NOT EXISTS internship_requirements (
+CREATE TABLE IF NOT EXISTS internship_skill (
     internship_id INT REFERENCES internship(internship_id) ON DELETE CASCADE,
     skill_id INT REFERENCES skill(skill_id) ON DELETE CASCADE,
     PRIMARY KEY (internship_id, skill_id)

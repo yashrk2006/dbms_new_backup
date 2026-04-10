@@ -3,286 +3,267 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  FileText, 
-  Zap, 
-  User, 
-  Menu,
-  X,
-  Shield,
-  ChevronRight,
-  UserCircle,
-  Terminal
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
-import { LiquidProgressBar } from '@/components/ui/LiquidProgressBar';
-import GsapMagnetic from '@/components/ui/GsapMagnetic';
 import { supabase } from '@/lib/supabase';
-import { LogoutButton } from '@/components/auth/LogoutButton';
+import { Toaster, toast } from 'react-hot-toast';
 
-const navItems = [
-  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, subtitle: 'SECTION 01' },
-  { href: '/dashboard/internships', label: 'Internships', icon: Briefcase, subtitle: 'SECTION 02' },
-  { href: '/dashboard/applications', label: 'Applications', icon: FileText, subtitle: 'SECTION 03' },
-  { href: '/dashboard/skills', label: 'My Skills', icon: Zap, subtitle: 'SECTION 04' },
-  { href: '/dashboard/profile', label: 'Profile Settings', icon: User, subtitle: 'SECTION 05' },
-];
+import { motion, AnimatePresence } from 'framer-motion';
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+// Helper component for Material Symbols Icons
+const Icon = ({ name, className = "", style = {} }: { name: string, className?: string, style?: any }) => (
+  <span className={`material-symbols-outlined ${className}`} style={style}>{name}</span>
+);
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const [authorized, setAuthorized] = useState(false);
-  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handler, { passive: true });
-    
-    async function checkAuth() {
+    async function checkSession() {
       const { data: { session } } = await supabase.auth.getSession();
-      
       if (!session) {
         router.push('/auth/login');
         return;
       }
-      setUser(session.user);
-      setAuthorized(true);
+      setLoading(false);
     }
-    
-    checkAuth();
+    checkSession();
+  }, [router]);
 
-    return () => window.removeEventListener("scroll", handler);
-  }, [pathname, router]);
+  const handleLogout = async () => {
+    toast.loading("Deauthenticating session...", { id: "logout-toast" });
+    try {
+      await supabase.auth.signOut();
+      // Clear any local storage caches (e.g. from dashboard)
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+      }
+      toast.success("Session Terminated", { id: "logout-toast" });
+      router.push('/auth/login');
+    } catch (error) {
+      toast.error("Logout failed", { id: "logout-toast" });
+    }
+  };
 
-  if (!authorized) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-10 gap-8">
-        <div className="size-20 rounded-3xl bg-amber-600/10 border border-amber-600/20 flex items-center justify-center text-amber-600 animate-pulse">
-           <Shield size={40} />
-        </div>
-        <div className="text-center space-y-2">
-            <h2 className="text-slate-900 text-xl font-black uppercase tracking-tighter">Synchronizing Profile</h2>
-            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[4px]">Accessing Personal Intelligence Suite...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return null;
 
   return (
-    <div className="flex min-h-screen bg-slate-50 relative selection:bg-amber-500/30 overflow-x-hidden" suppressHydrationWarning>
-      <LiquidProgressBar />
-      {/* Visual Background Layers */}
-      <div className="fixed inset-0 bg-white pointer-events-none z-0" suppressHydrationWarning />
-      <div className="fixed inset-0 bg-grid-pattern opacity-5 pointer-events-none z-0" suppressHydrationWarning />
-      <NeuralParticleField />
-
-      {/* Sidebar - Desktop Navigation */}
-      <aside className="hidden lg:flex w-80 flex-col bg-white border-r border-slate-100 fixed top-0 left-0 h-screen z-50 transition-all duration-500 shadow-sm" suppressHydrationWarning>
-        <div className="p-10" suppressHydrationWarning>
-          <GsapMagnetic>
-            <Link href="/dashboard" className="flex items-center gap-4 group no-underline" suppressHydrationWarning>
-              <div className="size-12 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-600/20 group-hover:scale-110 transition-all duration-500" suppressHydrationWarning>
-                <Shield size={24} className="text-white" />
-              </div>
-              <div className="flex flex-col" suppressHydrationWarning>
-                <h2 className="text-slate-900 text-2xl font-black leading-none tracking-tighter uppercase font-display group-hover:text-amber-600 transition-colors">
-                  SkillSync
-                </h2>
-                <span className="text-[9px] text-slate-400 font-black uppercase tracking-[0.4em] mt-1">
-                  Professional Portfolio
-                </span>
-              </div>
-            </Link>
-          </GsapMagnetic>
+    <div className="flex min-h-screen text-[#2d3335] bg-[#F4F7FF] selection:bg-primary/20">
+      
+      {/* --- DESKTOP SIDEBAR (LUMINESCENT AUDIT) --- */}
+      <aside className="hidden lg:flex w-[260px] bg-white flex-col p-6 fixed h-full z-50 overflow-y-auto overflow-x-hidden">
+        <div className="flex items-center gap-3 mb-10 px-4 shrink-0">
+          <Icon name="menu_book" className="text-2xl font-bold" />
+          <span className="text-xl font-extrabold tracking-[-0.04em]">SkillSync</span>
         </div>
 
-        <nav className="px-6 py-4 flex flex-col gap-3 pb-8" suppressHydrationWarning>
-          <div className="px-4 mb-6 flex items-center gap-3" suppressHydrationWarning>
-             <div className="h-px flex-1 bg-slate-100" />
-             <span className="text-[9px] font-black uppercase tracking-[5px] text-slate-400">Navigation</span>
-             <div className="h-px flex-1 bg-slate-100" />
-          </div>
-
-          <div className="space-y-2">
-            {navItems.map((item, idx) => {
-              const Icon = item.icon;
-              const active = pathname === item.href;
-              return (
-                <GsapMagnetic key={item.href} strength={0.3}>
-                  <Link 
-                    href={item.href} 
-                    className={`flex items-center gap-5 px-5 py-4 rounded-2xl transition-all duration-500 group relative overflow-hidden border ${
-                      active 
-                        ? "bg-amber-600 border-amber-600 text-white shadow-[0_10px_30px_rgba(217,119,6,0.2)]" 
-                        : "text-slate-500 border-transparent hover:border-amber-500/10 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
-                  >
-                    <Icon className={`size-5 transition-all duration-500 ${
-                      active ? "text-white" : "group-hover:text-amber-600 group-hover:scale-110"
-                    }`} />
-                    <div className="flex flex-col" suppressHydrationWarning>
-                        <span className="text-[11px] font-black uppercase tracking-[3px]">{item.label}</span>
-                        <span className={`text-[8px] font-bold uppercase tracking-widest leading-none mt-1 opacity-40 group-hover:opacity-60 transition-opacity ${
-                            active ? "text-white" : "text-slate-400"
-                        }`}>{item.subtitle}</span>
-                    </div>
-                    {active && (
-                      <motion.div 
-                        layoutId="active-nav-glow"
-                        className="absolute inset-x-0 bottom-0 h-1 bg-white/20"
-                      />
-                    )}
-                    <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <ChevronRight size={12} className={active ? "text-white" : "text-amber-600/40"} />
-                    </div>
-                  </Link>
-                </GsapMagnetic>
-              );
-            })}
-          </div>
+        <nav className="flex flex-col gap-1 flex-1 px-2 shrink-0">
+          {[
+            { name: 'Dashboard', icon: 'grid_view', path: '/dashboard' },
+            { name: 'Explore Careers', icon: 'explore', path: '/dashboard/internships' },
+            { name: 'My Skills', icon: 'psychology', path: '/dashboard/skills' },
+            { name: 'Job Board', icon: 'work', path: '/dashboard/applications' },
+            { name: 'Learning', icon: 'school', path: '/dashboard/learning' },
+            { name: 'Networking', icon: 'group', path: '/dashboard/networking' },
+            { name: 'Chat', icon: 'chat', path: '/dashboard/chat' },
+            { name: 'My Profile', icon: 'account_circle', path: '/dashboard/profile' },
+          ].map((item) => {
+            const isActive = pathname === item.path;
+            return (
+              <Link 
+                key={item.name}
+                href={item.path} 
+                className={`flex items-center gap-4 px-4 py-3.5 transition-colors ${
+                  isActive 
+                    ? 'bg-white rounded-[1rem] shadow-[0_4px_15px_rgba(147,149,211,0.1)] text-black' 
+                    : 'text-[#717171] hover:text-black'
+                }`}
+              >
+                <Icon 
+                  name={item.icon} 
+                  className="text-xl" 
+                  style={{ fontVariationSettings: isActive ? "'FILL' 1" : "" }} 
+                />
+                <span className={`text-[15px] tracking-tight ${isActive ? 'font-bold' : 'font-medium'}`}>{item.name}</span>
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="p-8 border-t border-slate-100 bg-slate-50/50">
-          <div className="mb-8 p-6 rounded-2xl bg-white border border-slate-100 shadow-sm">
-             <div className="flex items-center gap-4 mb-3">
-                <div className="flex items-center gap-4 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100 flex-1">
-                  <div className="size-8 rounded-lg bg-amber-600/10 flex items-center justify-center text-amber-600">
-                    <UserCircle size={20} />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-bold uppercase tracking-[2px] leading-tight text-slate-900">Student</p>
-                  </div>
-                </div>
-             </div>
-             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-                SkillSync Platform v1.0<br />
-                System Status: Production
-             </p>
-          </div>
-          <GsapMagnetic>
-            <div className="w-full">
-              <LogoutButton className="w-full justify-center py-4 rounded-2xl border border-red-500/20 text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-all duration-500" />
+        <div className="mt-8 space-y-4 px-2 shrink-0 pb-4">
+          <div className="bg-[#fffbe6] p-6 rounded-[2.2rem] relative overflow-hidden text-center mb-6 shadow-soft hover:-translate-y-1 transition-transform">
+            <div className="absolute -top-4 -right-2 w-16 h-16 bg-blue-100/40 rounded-full blur-xl"></div>
+            <div className="flex justify-center mb-2 gap-1">
+              <div className="w-6 h-10 bg-yellow-400 rounded-full transform rotate-12 shadow-md"></div>
+              <div className="w-8 h-4 bg-pink-300 rounded-full transform -rotate-12 mt-4 shadow-md"></div>
             </div>
-          </GsapMagnetic>
+            <div className="relative z-10">
+              <h4 className="font-extrabold text-[15px] mb-1">Upgrade to Pro</h4>
+              <p className="text-[11px] text-[#717171] mb-3 leading-tight">Get 1 month free and unlock all Pro features</p>
+              <div className="bg-white/80 inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold mb-4">
+                4.9 out of 5 🔥
+              </div>
+              <button className="w-full bg-black text-white py-3 rounded-2xl text-[11px] font-bold shadow-lg h-12" onClick={() => toast("Redirecting to Stripe checkout...", { icon: '💳' })}>Upgrade now</button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1 pb-4">
+            <button onClick={() => router.push('/dashboard/profile')} className="flex items-center gap-4 px-4 py-3 text-[#717171] hover:text-[#2d3335] transition-colors w-full text-left font-sans">
+              <Icon name="support" className="text-xl" />
+              <span className="text-[15px] font-bold tracking-tight">Support Center</span>
+            </button>
+            <button onClick={() => router.push('/dashboard/profile')} className="flex items-center gap-4 px-4 py-3 text-[#717171] hover:text-[#2d3335] transition-colors w-full text-left font-sans">
+              <Icon name="settings" className="text-xl" />
+              <span className="text-[15px] font-bold tracking-tight">System Settings</span>
+            </button>
+            <button 
+              onClick={handleLogout} 
+              className="flex items-center gap-4 px-4 py-3 text-rose-500 hover:text-rose-600 transition-colors w-full text-left group"
+            >
+              <Icon name="logout" className="text-xl group-hover:translate-x-1 transition-transform" />
+              <span className="text-[15px] font-bold tracking-tight">System Logout</span>
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* Mobile Tactical Header */}
-      <div className={`lg:hidden fixed top-0 left-0 right-0 h-24 transition-all duration-700 flex items-center justify-between px-8 z-[100] ${
-        isMobileMenuOpen || scrolled ? "bg-white/90 backdrop-blur-3xl border-b border-slate-100" : "bg-transparent"
-      }`}>
-        <Link href="/" className="flex items-center gap-4">
-          <div className="size-11 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-lg shadow-amber-600/20">
-            <Zap size={22} className="fill-current" />
+      {/* --- MOBILE TOP BAR --- */}
+      <header className="lg:hidden fixed top-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-white/80 backdrop-blur-xl border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="text-[#575a93] cursor-pointer p-2 -ml-2" onClick={() => setIsMobileMenuOpen(true)}>
+            <Icon name="menu" className="text-2xl" />
           </div>
-          <span className="font-display font-black text-2xl text-slate-900 uppercase tracking-tighter">SkillSync</span>
-        </Link>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="size-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-900 hover:bg-amber-600 hover:text-white transition-all duration-500 shadow-sm"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
+          <h1 className="text-[#575a93] font-black text-xl tracking-tighter">SkillSync</h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-[#575a93] cursor-pointer" onClick={() => router.push('/dashboard/notifications')}>
+            <Icon name="notifications" />
+          </div>
+          <button onClick={handleLogout} className="text-rose-500">
+            <Icon name="logout" />
+          </button>
+        </div>
+      </header>
 
-      {/* Mobile Menu Overlay - Full Screen Tactical */}
+      {/* --- MOBILE DRAWER --- */}
       <AnimatePresence>
         {isMobileMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, x: -100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -100 }}
-            className="lg:hidden fixed inset-0 bg-white z-[90] pt-32 px-10 flex flex-col gap-4 overflow-y-auto"
-          >
-             {/* Background elements */}
-            <div className="absolute inset-0 bg-slate-50 opacity-50 pointer-events-none" />
-            
-            <div className="mb-8 pl-4 flex items-center gap-3">
-              <Zap size={12} className="text-amber-600" />
-              <span className="text-[10px] font-black uppercase tracking-[6px] text-slate-400">Modules</span>
-            </div>
-            
-            <div className="flex flex-col gap-3">
-              {navItems.map((item, idx) => (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * idx }}
-                >
-                  <Link 
-                    href={item.href} 
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center gap-6 p-6 rounded-3xl transition-all border relative overflow-hidden ${
-                      pathname === item.href 
-                        ? "bg-amber-600 text-white border-amber-600 shadow-2xl shadow-amber-600/20" 
-                        : "bg-white text-slate-500 border-slate-100 hover:border-amber-500/20 shadow-sm"
-                    }`}
-                  >
-                    <item.icon size={28} className={pathname === item.href ? "text-white" : ""} />
-                    <div className="flex flex-col">
-                        <span className="text-sm font-black uppercase tracking-[4px]">{item.label}</span>
-                        <span className={`text-[9px] font-bold uppercase tracking-widest mt-1 opacity-50 ${pathname === item.href ? "text-white" : "text-slate-400"}`}>
-                            {item.subtitle}
-                        </span>
-                    </div>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[60] lg:hidden"
+            />
+            <motion.aside
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed inset-y-0 left-0 w-[280px] bg-white z-[70] lg:hidden flex flex-col p-6 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-10 px-2">
+                <div className="flex items-center gap-3">
+                  <Icon name="menu_book" className="text-2xl font-bold text-[#575a93]" />
+                  <span className="text-xl font-black tracking-tighter text-slate-900">SkillSync</span>
+                </div>
+                <button onClick={() => setIsMobileMenuOpen(false)} className="text-slate-400 p-2"><Icon name="close" /></button>
+              </div>
 
-            <div className="mt-auto pb-12 pt-12">
-               <LogoutButton className="w-full justify-center p-6 rounded-3xl bg-red-500/10 text-red-500 border border-red-500/20 font-black uppercase tracking-[4px] text-sm shadow-xl" />
-            </div>
-          </motion.div>
+              <nav className="flex flex-col gap-1 flex-1 overflow-y-auto">
+                {[
+                  { name: 'Dashboard', icon: 'grid_view', path: '/dashboard' },
+                  { name: 'Explore Careers', icon: 'explore', path: '/dashboard/internships' },
+                  { name: 'My Skills', icon: 'psychology', path: '/dashboard/skills' },
+                  { name: 'Job Board', icon: 'work', path: '/dashboard/applications' },
+                  { name: 'Learning', icon: 'school', path: '/dashboard/learning' },
+                  { name: 'Chat', icon: 'chat', path: '/dashboard/chat' },
+                  { name: 'My Profile', icon: 'account_circle', path: '/dashboard/profile' },
+                ].map((item) => {
+                  const isActive = pathname === item.path;
+                  return (
+                    <Link 
+                      key={item.name}
+                      href={item.path} 
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center gap-4 px-4 py-4 rounded-2xl transition-all ${
+                        isActive 
+                          ? 'bg-[#575a93]/10 text-[#575a93] font-bold' 
+                          : 'text-slate-500 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Icon 
+                        name={item.icon} 
+                        className="text-xl" 
+                        style={{ fontVariationSettings: isActive ? "'FILL' 1" : "" }} 
+                      />
+                      <span className="text-[15px] tracking-tight">{item.name}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div className="mt-auto pt-6 border-t border-slate-100 flex flex-col gap-2">
+                <button 
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center gap-4 px-4 py-4 text-rose-500 font-bold tracking-tight rounded-2xl hover:bg-rose-50 transition-colors"
+                >
+                  <Icon name="logout" className="text-xl" />
+                  <span>System Logout</span>
+                </button>
+              </div>
+            </motion.aside>
+          </>
         )}
       </AnimatePresence>
 
-      {/* Main Content Area - Commander Frame */}
-      <main className="flex-1 lg:ml-80 min-h-screen relative z-10 flex flex-col">
-        {/* Top Header - Global Actions */}
-        <header className="sticky top-0 z-40 h-20 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-8 flex items-center justify-between">
-           <div className="flex items-center gap-4">
-              <div className="hidden lg:flex items-center gap-3 px-4 py-2 rounded-xl bg-slate-50 border border-slate-100">
-                  <Terminal size={14} className="text-amber-600" />
-                  <span className="text-[10px] font-black uppercase tracking-[3px] text-slate-400">System Link: Stable</span>
-              </div>
-           </div>
-           
-           <div className="flex items-center gap-6">
-              <Link href="/dashboard/profile" className="flex items-center gap-3 group">
-                  <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-black uppercase tracking-[2px] text-slate-900 group-hover:text-amber-600 transition-colors">
-                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Neural Link..."}
-                      </span>
-                      <span className="text-[8px] font-bold uppercase tracking-[1px] text-slate-400">Validated Node</span>
-                  </div>
-                  <div className="size-10 rounded-full bg-slate-100 border border-slate-200 overflow-hidden group-hover:border-amber-500 transition-all">
-                      <div className="size-full bg-amber-600/10 flex items-center justify-center text-amber-600">
-                          <User size={20} />
-                      </div>
-                  </div>
-              </Link>
-              
-              <div className="h-8 w-[1px] bg-slate-100" />
-              
-              <LogoutButton className="hidden md:flex bg-white border border-red-100 text-red-500 hover:bg-red-50" showText={false} />
-           </div>
-        </header>
+      {/* --- MOBILE BOTTOM NAV (1:1 PORT) --- */}
+      <nav className="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 backdrop-blur-xl rounded-t-[2rem] z-50 shadow-[0px_-10px_40px_rgba(45,51,53,0.06)] border-none">
+        {[
+          { name: 'Dashboard', icon: 'dashboard', path: '/dashboard' },
+          { name: 'Explore', icon: 'explore', path: '/dashboard/internships' },
+          { name: 'Skills', icon: 'military_tech', path: '/dashboard/skills' },
+          { name: 'Learning', icon: 'school', path: '/dashboard/learning' },
+          { name: 'Profile', icon: 'account_circle', path: '/dashboard/profile' },
+        ].map((item) => {
+          const isActive = pathname === item.path;
+          return (
+            <Link 
+              key={item.name}
+              href={item.path} 
+              className={`flex flex-col items-center justify-center rounded-full px-5 py-2 transition-all duration-300 ${
+                isActive 
+                  ? 'bg-[#575a93]/10 text-[#575a93]' 
+                  : 'text-slate-400'
+              }`}
+            >
+              <Icon 
+                name={item.icon} 
+                className="text-2xl" 
+                style={{ fontVariationSettings: isActive ? "'FILL' 1" : "" }} 
+              />
+              <span className="text-[11px] font-medium tracking-wide uppercase mt-0.5">{item.name}</span>
+            </Link>
+          );
+        })}
+      </nav>
 
-        {/* Subtle content glow */}
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-amber-500/5 blur-[150px] rounded-full pointer-events-none z-[-1]" />
-        
-        <div className="max-w-7xl mx-auto p-8 lg:p-12 w-full">
+      {/* Main Content Area */}
+      <main className="lg:ml-[260px] flex-1 min-h-screen">
+        <div className="max-w-[1600px] mx-auto min-h-screen p-4 md:p-6 lg:p-8">
+          <Toaster position="top-right" />
           {children}
         </div>
       </main>
     </div>
   );
 }
-

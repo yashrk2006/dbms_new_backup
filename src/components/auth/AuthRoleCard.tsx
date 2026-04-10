@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { LucideIcon, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { LucideIcon, ArrowRight, CheckCircle2, Zap } from 'lucide-react';
 
 interface AuthRoleCardProps {
   role: {
@@ -85,13 +85,13 @@ export default function AuthRoleCard({
                   <div className="size-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <img src="https://www.google.com/favicon.ico" className="size-4" alt="Google" />
-                    {type === 'login' ? 'Sync Identity with Google' : 'Create Intelligence ID'}
+                    <Zap size={16} className="text-amber-500 group-hover/btn:text-white transition-colors" />
+                    {type === 'login' ? 'Sync Identity Terminal' : 'Initialize Neural Profile'}
                   </>
                 )}
               </button>
               <p className="text-center text-[9px] font-bold text-amber-600 uppercase tracking-widest flex items-center justify-center gap-2">
-                 <CheckCircle2 size={10} /> Secure Sync Protocol Active
+                 <CheckCircle2 size={10} /> Secure Protocol Active
               </p>
             </motion.div>
           ) : (

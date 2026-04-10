@@ -5,18 +5,26 @@ export interface Skill {
 
 export interface Internship {
   id: string;
+  internship_id: number;
   company_id: string;
   company_name: string;
   title: string;
   description: string;
   requirements: {
     role_skills: string[];
-    experience_level: string;
+    experience_level?: string;
   };
   duration: string;
   stipend: string;
   location: string;
   status: 'Open' | 'Closed';
+  // AI Match Engine Fields
+  match_percentage?: number;
+  success_probability?: number;
+  applied?: boolean;
+  required_skills?: string[];
+  missing_skills?: string[];
+  match_diagnosis?: any;
 }
 
 export interface Application {
@@ -31,6 +39,7 @@ export interface Application {
   role_title?: string;
   company_name?: string;
   match_score?: number;
+  ai_match_score?: number;
   ai_interview_guide?: string[];
 }
 
@@ -38,6 +47,7 @@ export interface Student {
   id: string;
   name: string;
   email: string;
+  roll_no?: string;
   college: string;
   skills: Skill[];
   market_reach?: number;
@@ -45,6 +55,7 @@ export interface Student {
     name: string;
     boost: number;
   };
+  ai_resume_analysis?: any;
 }
 
 export interface Company {

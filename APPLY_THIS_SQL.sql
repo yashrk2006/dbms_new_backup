@@ -1,37 +1,26 @@
 -- ============================================================
--- SkillSync — Full Schema + RLS + Seed Data
--- 
--- HOW TO APPLY:
--- 1. Go to: https://supabase.com/dashboard/project/cwtyqajzdlfzybnzjpma/sql/new
--- 2. Paste this entire file
--- 3. Click "Run"
+-- SkillSync — COMPLETE SCHEMATIC RESET (v2.3)
+-- UNIFIED SCHEMA: Core + Institutional Identity + Auto-Linking
 -- ============================================================
 
--- Clean up any old tables that might have incompatible column types (like INT instead of UUID)
+-- 1. DESTRUCTIVE CLEANUP
 DROP TABLE IF EXISTS application CASCADE;
-DROP TABLE IF EXISTS internship_requirements CASCADE;
+DROP TABLE IF EXISTS internship_skill CASCADE;
 DROP TABLE IF EXISTS student_skill CASCADE;
 DROP TABLE IF EXISTS internship CASCADE;
 DROP TABLE IF EXISTS skill CASCADE;
 DROP TABLE IF EXISTS company CASCADE;
 DROP TABLE IF EXISTS admin CASCADE;
 DROP TABLE IF EXISTS student CASCADE;
+DROP TABLE IF EXISTS event CASCADE;
+DROP TABLE IF EXISTS course CASCADE;
+DROP TABLE IF EXISTS notification CASCADE;
+DROP TABLE IF EXISTS college_directory CASCADE;
+DROP TABLE IF EXISTS otp_logs CASCADE;
+DROP TABLE IF EXISTS professor CASCADE;
 
--- NEW: Decommission Shadow Tables (Legacy Plural/Capitalized conflicts)
-DROP TABLE IF EXISTS applications CASCADE;
-DROP TABLE IF EXISTS companies CASCADE;
-DROP TABLE IF EXISTS internships CASCADE;
-DROP TABLE IF EXISTS students CASCADE;
-DROP TABLE IF EXISTS skills CASCADE;
-DROP TABLE IF EXISTS student_skills CASCADE;
-DROP TABLE IF EXISTS internship_skills CASCADE;
-
--- Clean up leftover Supabase starter template artifacts causing integer/uuid conflicts
-DROP TABLE IF EXISTS public.profiles CASCADE;
-DROP FUNCTION IF EXISTS public.handle_new_user CASCADE;
-
--- Tables
-CREATE TABLE IF NOT EXISTS student (
+-- 2. CORE TABLE DEFINITIONS
+CREATE TABLE student (
     student_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -39,10 +28,12 @@ CREATE TABLE IF NOT EXISTS student (
     branch VARCHAR(255),
     graduation_year INT,
     resume_url TEXT,
-    is_active BOOLEAN DEFAULT true
+    is_active BOOLEAN DEFAULT true,
+    market_reach INTEGER DEFAULT 0,
+    ai_resume_analysis JSONB
 );
 
-CREATE TABLE IF NOT EXISTS company (
+CREATE TABLE company (
     company_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     company_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -51,154 +42,182 @@ CREATE TABLE IF NOT EXISTS company (
     is_verified BOOLEAN DEFAULT false
 );
 
-CREATE TABLE IF NOT EXISTS admin (
+CREATE TABLE admin (
     admin_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     email VARCHAR(255) UNIQUE NOT NULL,
     role VARCHAR(50) DEFAULT 'admin'
 );
 
-CREATE TABLE IF NOT EXISTS skill (
+CREATE TABLE skill (
     skill_id SERIAL PRIMARY KEY,
     skill_name VARCHAR(255) UNIQUE NOT NULL,
     category VARCHAR(255)
 );
 
-CREATE TABLE IF NOT EXISTS internship (
+CREATE TABLE internship (
     internship_id SERIAL PRIMARY KEY,
     company_id UUID REFERENCES company(company_id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     duration VARCHAR(50),
     stipend VARCHAR(100),
-    location VARCHAR(255)
+    location VARCHAR(255),
+    internship_type VARCHAR(50) DEFAULT 'Remote',
+    start_date DATE,
+    openings INTEGER DEFAULT 1,
+    perks TEXT,
+    deadline DATE
 );
 
-CREATE TABLE IF NOT EXISTS student_skill (
+CREATE TABLE student_skill (
     student_id UUID REFERENCES student(student_id) ON DELETE CASCADE,
     skill_id INT REFERENCES skill(skill_id) ON DELETE CASCADE,
     proficiency_level VARCHAR(50) CHECK (proficiency_level IN ('Beginner','Intermediate','Advanced','Expert')),
     PRIMARY KEY (student_id, skill_id)
 );
 
-CREATE TABLE IF NOT EXISTS internship_requirements (
+CREATE TABLE internship_skill (
     internship_id INT REFERENCES internship(internship_id) ON DELETE CASCADE,
     skill_id INT REFERENCES skill(skill_id) ON DELETE CASCADE,
     PRIMARY KEY (internship_id, skill_id)
 );
 
-CREATE TABLE IF NOT EXISTS application (
+CREATE TABLE application (
     application_id SERIAL PRIMARY KEY,
     student_id UUID REFERENCES student(student_id) ON DELETE CASCADE,
     internship_id INT REFERENCES internship(internship_id) ON DELETE CASCADE,
     applied_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(50) DEFAULT 'Pending'
         CHECK (status IN ('Pending','Under Review','Interviewing','Accepted','Rejected')),
+    ai_match_score INTEGER,
+    ai_interview_questions JSONB,
     UNIQUE (student_id, internship_id)
 );
 
--- Seed 15 skills
+CREATE TABLE event (
+    event_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    event_type VARCHAR(100),
+    start_time TIMESTAMP NOT NULL,
+    description TEXT,
+    location VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE course (
+    course_id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(100),
+    color VARCHAR(100),
+    icon VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE notification (
+    notification_id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) DEFAULT 'system',
+    is_read BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE college_directory (
+    id SERIAL PRIMARY KEY,
+    roll_no VARCHAR(50) UNIQUE,
+    enrollment_no VARCHAR(50) UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'student' CHECK (role IN ('student', 'professor', 'admin')),
+    email VARCHAR(255),
+    course VARCHAR(255),
+    branch VARCHAR(255),
+    batch_year INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE otp_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) NOT NULL,
+    roll_no VARCHAR(50),
+    otp_code VARCHAR(6) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    is_verified BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. PROFILES VIEW
+CREATE OR REPLACE VIEW profiles AS
+  SELECT student_id as id, email, 'student' as role FROM student
+  UNION ALL
+  SELECT company_id as id, email, 'company' as role FROM company
+  UNION ALL
+  SELECT admin_id as id, email, 'admin' as role FROM admin;
+
+-- 4. STATIC & DYNAMIC SEEDING
 INSERT INTO skill (skill_name, category) VALUES
   ('Python','Programming'),('React','Frontend'),('SQL','Database'),
   ('Machine Learning','AI/ML'),('Node.js','Backend'),('Java','Programming'),
-  ('TypeScript','Frontend'),('Docker','DevOps'),('Figma','Design'),
-  ('Excel','Analytics'),('C++','Programming'),('Django','Backend'),
-  ('Flutter','Mobile'),('AWS','Cloud'),('MongoDB','Database')
-ON CONFLICT DO NOTHING;
+  ('TypeScript','Frontend'),('Docker','DevOps'),('Figma','Design') ON CONFLICT DO NOTHING;
 
--- Demo student user (for demo mode — no login required)
-INSERT INTO auth.users (
-  id, instance_id, aud, role, email,
-  encrypted_password, email_confirmed_at, created_at, updated_at,
-  raw_user_meta_data
-) VALUES (
-  '00000000-0000-0000-0000-000000000000',
-  '00000000-0000-0000-0000-000000000000',
-  'authenticated', 'authenticated',
-  'demo@student.com',
-  '$2a$10$PgjZCUMBxFHPsG7bGGGpxOqHBHFHFHFHFHFHFHFHFHFHFHFHFHFH',
-  now(), now(), now(),
-  '{"role":"student","first_name":"Demo","last_name":"Student"}'::jsonb
-) ON CONFLICT DO NOTHING;
+INSERT INTO course (title, description, category, color, icon) VALUES 
+  ('Figma Pro', 'Advanced design systems.', 'Design', 'bg-purple-50', 'Figma'),
+  ('Neural Networks', 'Implementing deep learning.', 'AI', 'bg-amber-50', 'Brain') ON CONFLICT DO NOTHING;
 
-INSERT INTO student (student_id, name, email, college, branch, graduation_year)
-VALUES (
-  '00000000-0000-0000-0000-000000000000',
-  'Demo Student', 'demo@student.com',
-  'Demo Tech University', 'Computer Science', 2025
-) ON CONFLICT DO NOTHING;
+INSERT INTO college_directory (roll_no, enrollment_no, name, course, branch, batch_year)
+VALUES ('24/70001', 'EN24101', 'SkillSync User', 'B.Tech', 'Computer Science', 2025) ON CONFLICT DO NOTHING;
 
--- Demo Companies
-INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data) VALUES 
-('11111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'tech@innovate.com', '$2a$10$PgjZCUMBxFHPsG7bGGGpxOqHBHFHFHFHFHFHFHFHFHFHFHFHFHFH', now(), now(), now(), '{"role":"company","company_name":"InnovateTech"}'),
-('22222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'hr@globalfinance.com', '$2a$10$PgjZCUMBxFHPsG7bGGGpxOqHBHFHFHFHFHFHFHFHFHFHFHFHFHFH', now(), now(), now(), '{"role":"company","company_name":"Global Finance"}')
-ON CONFLICT DO NOTHING;
+-- AUTO-LINK EXISTING AUTH USERS
+INSERT INTO student (student_id, email, name, college, branch, graduation_year, market_reach)
+SELECT id, email, 'SkillSync User', 'SkillSync Institute', 'Computer Science', 2025, 85
+FROM auth.users WHERE email = 'demo@student.com'
+ON CONFLICT (student_id) DO NOTHING;
 
-INSERT INTO company (company_id, company_name, email, industry, location) VALUES 
-('11111111-1111-1111-1111-111111111111', 'InnovateTech', 'tech@innovate.com', 'Technology', 'Bengaluru, India'),
-('22222222-2222-2222-2222-222222222222', 'Global Finance', 'hr@globalfinance.com', 'Finance', 'Mumbai, India')
-ON CONFLICT DO NOTHING;
+INSERT INTO admin (admin_id, email, role)
+SELECT id, email, 'admin'
+FROM auth.users WHERE email = 'admin@skillsync.com'
+ON CONFLICT (admin_id) DO NOTHING;
 
--- Demo Internships
-INSERT INTO internship (internship_id, company_id, title, description, duration, stipend, location) VALUES 
-(1, '11111111-1111-1111-1111-111111111111', 'Frontend Developer Intern', 'Join our team to build amazing user interfaces using React and Next.js.', '6 Months', '₹30,000/month', 'Remote'),
-(2, '11111111-1111-1111-1111-111111111111', 'Backend System Engineer', 'Work on high-performance scalable APIs with Node.js and PostgreSQL.', '3 Months', '₹45,000/month', 'Bengaluru, India'),
-(3, '22222222-2222-2222-2222-222222222222', 'Data Analyst Intern', 'Analyze financial datasets to extract actionable insights for trading strategies.', '3 Months', '₹25,000/month', 'Mumbai, India')
-ON CONFLICT DO NOTHING;
+INSERT INTO company (company_id, company_name, email, industry, location, is_verified)
+SELECT id, 'InnovateTech', email, 'AI Research', 'Metaverse', true
+FROM auth.users WHERE email = 'tech@innovate.com'
+ON CONFLICT (company_id) DO NOTHING;
 
--- Demo Applications for the student
-INSERT INTO application (student_id, internship_id, status) VALUES 
-('00000000-0000-0000-0000-000000000000', 1, 'Under Review'),
-('00000000-0000-0000-0000-000000000000', 3, 'Pending')
-ON CONFLICT DO NOTHING;
+-- SEED DEPENDENT DATA (INTERNSHIPS, ETC)
+DO $$
+DECLARE
+    cid UUID;
+    sid UUID;
+    iid INT;
+BEGIN
+    SELECT id INTO cid FROM auth.users WHERE email = 'tech@innovate.com';
+    SELECT id INTO sid FROM auth.users WHERE email = 'demo@student.com';
+    
+    IF cid IS NOT NULL THEN
+        INSERT INTO internship (company_id, title, description, duration, stipend, location, internship_type, openings)
+        VALUES (cid, 'Neural Sync Intern', 'Deep dive into SkillSync architecture.', '6 Months', '₹50,000', 'Remote', 'Remote', 5)
+        RETURNING internship_id INTO iid;
+        
+        IF sid IS NOT NULL AND iid IS NOT NULL THEN
+            INSERT INTO application (student_id, internship_id, status, ai_match_score)
+            VALUES (sid, iid, 'Under Review', 94)
+            ON CONFLICT DO NOTHING;
+        END IF;
+    END IF;
+END $$;
 
--- Demo Student Skills
-INSERT INTO student_skill (student_id, skill_id, proficiency_level) VALUES 
-('00000000-0000-0000-0000-000000000000', 2, 'Intermediate'),
-('00000000-0000-0000-0000-000000000000', 5, 'Beginner')
-ON CONFLICT DO NOTHING;
-
--- RLS
-ALTER TABLE student ENABLE ROW LEVEL SECURITY;
-ALTER TABLE company ENABLE ROW LEVEL SECURITY;
-ALTER TABLE skill ENABLE ROW LEVEL SECURITY;
-ALTER TABLE internship ENABLE ROW LEVEL SECURITY;
-ALTER TABLE student_skill ENABLE ROW LEVEL SECURITY;
-ALTER TABLE internship_requirements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE application ENABLE ROW LEVEL SECURITY;
-
--- Public read for demo mode (anon can read skills, internships, companies)
-CREATE POLICY "skill_read"             ON skill                  FOR SELECT USING (true);
-CREATE POLICY "internship_read"        ON internship             FOR SELECT USING (true);
-CREATE POLICY "internship_req_read"    ON internship_requirements FOR SELECT USING (true);
-CREATE POLICY "company_read"           ON company                FOR SELECT USING (true);
-
--- Student: own row only
-CREATE POLICY "student_select_own"     ON student       FOR SELECT USING (auth.uid() = student_id OR student_id = '00000000-0000-0000-0000-000000000000');
-CREATE POLICY "student_insert_own"     ON student       FOR INSERT WITH CHECK (auth.uid() = student_id);
-CREATE POLICY "student_update_own"     ON student       FOR UPDATE USING (auth.uid() = student_id OR student_id = '00000000-0000-0000-0000-000000000000');
-
--- Student skills: own row + demo user
-CREATE POLICY "student_skill_own"      ON student_skill FOR ALL   USING (auth.uid() = student_id OR student_id = '00000000-0000-0000-0000-000000000000');
-
--- Applications: own row + demo user
-CREATE POLICY "application_own"        ON application   FOR ALL   USING (auth.uid() = student_id OR student_id = '00000000-0000-0000-0000-000000000000');
-
--- Admin read-all (Open for Demo Hackathon Mode)
-CREATE POLICY "student_admin_read"     ON student       FOR SELECT USING (true);
-CREATE POLICY "student_skill_admin"    ON student_skill FOR SELECT USING (true);
-CREATE POLICY "application_admin"      ON application   FOR SELECT USING (true);
-
--- ============================================================
--- Fix Permissions & Schema Cache
--- ============================================================
-GRANT ALL ON TABLE admin TO anon, authenticated, service_role;
-GRANT ALL ON TABLE student TO anon, authenticated, service_role;
-GRANT ALL ON TABLE company TO anon, authenticated, service_role;
-GRANT ALL ON TABLE skill TO anon, authenticated, service_role;
-GRANT ALL ON TABLE student_skill TO anon, authenticated, service_role;
-GRANT ALL ON TABLE internship TO anon, authenticated, service_role;
-GRANT ALL ON TABLE application TO anon, authenticated, service_role;
-
+-- 5. PERMISSIONS
+GRANT ALL ON TABLE admin, student, company, skill, student_skill, internship, application, event, course, notification, college_directory, otp_logs TO anon, authenticated, service_role;
+GRANT SELECT ON TABLE profiles TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
+ALTER TABLE student ENABLE ROW LEVEL SECURITY;
+ALTER TABLE application ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_read_access" ON student FOR SELECT USING (true);
+CREATE POLICY "demo_write_access" ON student FOR ALL USING (true);
+CREATE POLICY "public_read_access" ON application FOR SELECT USING (true);
+CREATE POLICY "demo_write_access" ON application FOR ALL USING (true);
 
 NOTIFY pgrst, 'reload schema';

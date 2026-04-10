@@ -10,6 +10,7 @@ import {
   ShieldCheck, BarChart3, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 import AnimatedSection from '@/components/ui/AnimatedSection';
 import { supabase } from '@/lib/supabase';
 
@@ -32,6 +33,7 @@ export default function SkillsPage() {
   const [adding, setAdding] = useState(false);
   const [selectedSkillName, setSelectedSkillName] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<typeof LEVELS[number]>('Beginner');
+  const [aiSkillSuggestions, setAiSkillSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [aiInsights, setAiInsights] = useState<{ marketReach: number, nextBestSkill: any } | null>(null);
@@ -52,6 +54,13 @@ export default function SkillsPage() {
         setAllSkills(result.allSkills || []);
         setMySkills(result.studentSkills || []);
         setAiInsights(result.aiInsights);
+        
+        // Extract suggestions from AI Resume Analysis
+        if (result.aiResumeAnalysis?.skills) {
+          const existingNames = new Set(result.studentSkills.map((s: any) => s.skill_name.toLowerCase()));
+          const suggestions = result.aiResumeAnalysis.skills.filter((s: string) => !existingNames.has(s.toLowerCase()));
+          setAiSkillSuggestions(suggestions);
+        }
       }
     } catch (err) {
       console.error('Failed to load skills:', err);
@@ -62,158 +71,184 @@ export default function SkillsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const skillAnalytics = useMemo(() => {
-    if (mySkills.length === 0) return null;
-    const order = { 'Expert': 4, 'Advanced': 3, 'Intermediate': 2, 'Beginner': 1 };
-    const sorted = [...mySkills].sort((a, b) => 
-      order[b.proficiency_level as keyof typeof order] - order[a.proficiency_level as keyof typeof order]
-    );
-    const categories: Record<string, number> = {};
-    mySkills.forEach(s => {
-      const cat = s.category || 'General';
-      categories[cat] = (categories[cat] || 0) + 1;
-    });
-    const topCategory = Object.entries(categories).sort((a,b) => b[1] - a[1])[0]?.[0] || 'Professional';
-    return {
-      topSkill: sorted[0],
-      topCategory,
-      skillCount: mySkills.length,
-      strengthScore: Math.min(Math.round((mySkills.length / 8) * 100), 100)
-    };
-  }, [mySkills]);
-
-  async function handleAddSkill() {
+  const addSkill = async () => {
     if (!selectedSkillName) return;
     setAdding(true);
     const { data: { session } } = await supabase.auth.getSession();
-    const storedUserId = session?.user?.id;
-    
-    if (!storedUserId) {
-      setAdding(false);
-      router.push('/auth/login');
-      return;
-    }
+    const userId = session?.user?.id;
+    if (!userId) return;
+
     try {
-      const response = await fetch('/api/skills', {
+      const resp = await fetch('/api/skills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: storedUserId,
-          skillName: selectedSkillName,
-          proficiencyLevel: selectedLevel,
-          action: 'upsert'
-        })
+        body: JSON.stringify({ userId, skillName: selectedSkillName, proficiencyLevel: selectedLevel })
       });
-      const result = await response.json();
+      const result = await resp.json();
       if (result.success) {
         setMySkills(result.data);
         setSelectedSkillName('');
+        setSearchQuery('');
+        setAiSkillSuggestions(prev => prev.filter(s => s !== selectedSkillName));
       }
     } catch (err) {
-      console.error('Add skill error:', err);
+      console.error(err);
     } finally {
       setAdding(false);
     }
-  }
+  };
 
-  async function removeSkill(skillName: string) {
+  const removeSkill = async (skillName: string) => {
     const { data: { session } } = await supabase.auth.getSession();
-    const storedUserId = session?.user?.id;
-    if (!storedUserId) return;
+    const userId = session?.user?.id;
+    if (!userId) return;
+
     try {
-      const response = await fetch('/api/skills', {
+      const resp = await fetch('/api/skills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: storedUserId,
-          skillName,
-          action: 'delete'
-        })
+        body: JSON.stringify({ userId, skillName, action: 'delete' })
       });
-      const result = await response.json();
+      const result = await resp.json();
       if (result.success) {
         setMySkills(result.data);
       }
-    } catch (err) {
-      console.error('Remove skill error:', err);
-    }
-  }
+    } catch (err) { console.error(err); }
+  };
 
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center h-[70vh] gap-10">
-      <motion.div animate={{ rotate: 360, scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }} className="text-amber-600">
-        <Cpu size={80} className="fill-amber-600/10" />
-      </motion.div>
-      <div className="text-center">
-         <h2 className="text-xs font-black uppercase tracking-[12px] text-amber-600 mb-4 antialiased">Calibrating Attributes</h2>
-         <p className="text-slate-500 text-[10px] font-black uppercase tracking-[6px] animate-pulse">Syncing Professional Intelligence Records</p>
-      </div>
-    </div>
-  );
-
-  const availableSkills = allSkills
-    .filter(s => s.skill_name.toLowerCase().includes(searchQuery.toLowerCase()))
-    .sort((a,b) => a.skill_name.localeCompare(b.skill_name));
+  const filteredSkills = useMemo(() => {
+    if (!searchQuery) return [];
+    return allSkills.filter(s => 
+      s.skill_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !mySkills.find(ms => ms.skill_name.toLowerCase() === s.skill_name.toLowerCase())
+    ).slice(0, 5);
+  }, [allSkills, searchQuery, mySkills]);
 
   return (
-    <div className="space-y-12 pb-24 max-w-7xl mx-auto">
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-12 pb-12 border-b border-slate-100">
-        <AnimatedSection direction="up" distance={40} className="max-w-2xl">
-          <div className="flex items-center gap-4 mb-6">
-             <div className="size-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
-                <Cpu size={18} className="animate-pulse" />
-             </div>
-             <h2 className="text-[10px] font-black uppercase tracking-[8px] text-slate-400">Competitive Edge Center</h2>
-          </div>
-          <h1 className="text-5xl md:text-7xl font-black text-slate-950 tracking-tight uppercase leading-[0.9] mb-6">
-            Skill<br /><span className="text-amber-600">Inventory.</span>
-          </h1>
-          <p className="text-slate-500 font-medium text-lg leading-relaxed uppercase tracking-tight">Manage verified competencies and align with organizational demand.</p>
-        </AnimatedSection>
-        
-        <AnimatedSection direction="up" className="flex items-center gap-8 bg-slate-900 px-10 py-8 rounded-[2.5rem] border border-white/10 shadow-2xl relative overflow-hidden group" delay={0.2}>
-           <div className="absolute inset-0 bg-gradient-to-br from-amber-600/20 to-transparent opacity-50 pointer-events-none" />
-           <div className="size-16 rounded-2xl bg-white/10 flex items-center justify-center text-amber-500 border border-white/5 shadow-inner"><Target size={28} /></div>
-           <div className="flex flex-col relative z-10">
-              <span className="text-[9px] font-black uppercase tracking-[4px] text-white/40 mb-1">Market Reach Score</span>
-              <span className="text-3xl font-black tracking-tighter text-white">{aiInsights?.marketReach || 0}%</span>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[9px] font-bold uppercase tracking-[2px] text-white/60">AI Intelligence Optimized</span>
-              </div>
-           </div>
-        </AnimatedSection>
-      </div>
+    <div className="space-y-12 pb-24">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-1">
+          <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight uppercase leading-none">Skill Matrix</h1>
+          <p className="text-slate-500 font-bold uppercase tracking-[4px] text-[10px]">SkillSync Recruitment Ecosystem • Technical Inventory Control</p>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-100 shadow-sm text-slate-400 font-black text-[9px] uppercase tracking-[3px]">
+          <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Active Intelligence
+        </div>
+      </header>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-12">
          <div className="xl:col-span-1 space-y-10">
             <AnimatedSection direction="up" className="space-y-8">
                 <div className="flex items-center gap-4">
-                    <div className="size-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-amber-600 shadow-sm"><Plus size={20} /></div>
+                    <div className="size-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/20"><Plus size={20} /></div>
                     <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Inventory Management</h2>
                 </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
-                    <div className="space-y-4">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] ml-1">Search & Select</label>
-                        <select value={selectedSkillName} onChange={e => setSelectedSkillName(e.target.value)} className="w-full h-16 pl-6 pr-12 rounded-2xl border border-slate-100 bg-slate-50 text-[11px] font-black uppercase tracking-[2px] focus:border-amber-500/30 outline-none appearance-none">
-                            <option value="">Select competency...</option>
-                            {availableSkills.map(s => <option key={s.skill_id} value={s.skill_name}>{s.skill_name}</option>)}
-                        </select>
-                    </div>
-                    <div className="space-y-4">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-[4px] ml-1">Proficiency Level</label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {LEVELS.map(level => (
-                                <button key={level} onClick={() => setSelectedLevel(level)} className={`px-4 py-4 rounded-xl border text-[9px] font-black uppercase tracking-[2px] transition-all ${selectedLevel === level ? "bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-600/20 scale-105" : "bg-white border-slate-100 text-slate-400 hover:border-amber-200"}`}>{level}</button>
-                            ))}
+                
+                <div className="p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-premium space-y-8">
+                    <div className="space-y-6">
+                        <div className="space-y-2 relative">
+                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-[3px] ml-1">Search Identifier</label>
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-5 flex items-center text-slate-400 group-focus-within:text-amber-600 transition-colors">
+                                    <Search size={16} />
+                                </div>
+                                <input 
+                                    type="text" 
+                                    placeholder="SEARCH 40+ SKILLS..."
+                                    value={searchQuery || selectedSkillName}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:bg-white focus:ring-4 focus:ring-slate-900/5 focus:border-slate-300 transition-all outline-none placeholder:text-slate-300"
+                                />
+                                <AnimatePresence>
+                                    {filteredSkills.length > 0 && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+                                            className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-[1.5rem] shadow-2xl z-50 overflow-hidden"
+                                        >
+                                            {filteredSkills.map(s => (
+                                                <button 
+                                                    key={s.skill_id}
+                                                    onClick={() => {
+                                                        setSelectedSkillName(s.skill_name);
+                                                        setSearchQuery('');
+                                                    }}
+                                                    className="w-full px-6 py-4 text-left hover:bg-slate-50 transition-colors flex items-center justify-between group/item"
+                                                >
+                                                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">{s.skill_name}</span>
+                                                    <ChevronRight size={14} className="text-slate-300 group-hover/item:translate-x-1 group-hover/item:text-amber-600 transition-all" />
+                                                </button>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
                         </div>
+
+                        <div className="space-y-2">
+                           <label className="text-[9px] font-black text-slate-400 uppercase tracking-[3px] ml-1">Proficiency Level</label>
+                           <div className="grid grid-cols-2 gap-3">
+                              {LEVELS.map(level => {
+                                 const config = levelConfig[level];
+                                 const Icon = config.icon;
+                                 return (
+                                    <button 
+                                       key={level}
+                                       onClick={() => setSelectedLevel(level)}
+                                       className={`p-4 rounded-2xl border text-left transition-all ${
+                                          selectedLevel === level 
+                                             ? `${config.bg} ${config.color} border-transparent shadow-inner ring-2 ring-slate-900/5` 
+                                             : 'bg-white border-slate-100 hover:border-slate-300 text-slate-400'
+                                       }`}
+                                    >
+                                       <Icon size={14} className="mb-2" />
+                                       <div className="text-[9px] font-black uppercase tracking-widest">{level}</div>
+                                    </button>
+                                 );
+                              })}
+                           </div>
+                        </div>
+
+                        <button 
+                            onClick={addSkill}
+                            disabled={adding || !selectedSkillName}
+                            className="w-full py-5 bg-slate-900 text-white rounded-[1.5rem] font-black uppercase tracking-[3px] text-[10px] hover:bg-amber-600 shadow-xl shadow-slate-900/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-3"
+                        >
+                            {adding ? <Activity size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+                            {adding ? 'SYNCHRONIZING...' : 'INJECT INTO MATRIX'}
+                        </button>
                     </div>
-                    <motion.button whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }} onClick={handleAddSkill} disabled={!selectedSkillName || adding} className={`w-full h-16 rounded-2xl text-[10px] font-black uppercase tracking-[4px] flex items-center justify-center gap-4 transition-all shadow-xl ${!selectedSkillName || adding ? "bg-slate-50 text-slate-300 cursor-not-allowed" : "bg-slate-900 text-white"}`}>
-                        {adding ? <Activity className="animate-spin size-4" /> : <Zap size={16} className="fill-current" />}
-                        {adding ? 'Processing...' : 'SECURE COMPETENCY'}
-                    </motion.button>
                 </div>
             </AnimatedSection>
+
+            <AnimatePresence>
+                {aiSkillSuggestions.length > 0 && (
+                    <AnimatedSection direction="up" delay={0.1} className="space-y-8">
+                        <div className="flex items-center gap-4">
+                            <div className="size-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm"><Sparkles size={20} /></div>
+                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">Skill Extractions</h2>
+                        </div>
+                        <div className="p-8 bg-white rounded-[2.5rem] border border-indigo-100 shadow-xl shadow-indigo-600/5 space-y-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-[0.03] scale-150"><Cpu size={100} /></div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-loose">Based on your recent resume analysis, we detected these competencies. Add them to your matrix:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {aiSkillSuggestions.map(skill => (
+                                    <button 
+                                        key={skill}
+                                        onClick={() => {
+                                            setSelectedSkillName(skill);
+                                            // Scroll to input if needed
+                                        }}
+                                        className="px-4 py-2 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 text-[10px] font-black uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all transform hover:-translate-y-0.5 active:scale-95"
+                                    >
+                                        + {skill}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </AnimatedSection>
+                )}
+            </AnimatePresence>
 
             <AnimatedSection direction="up" delay={0.2} className="space-y-8">
                 <div className="flex items-center gap-4">

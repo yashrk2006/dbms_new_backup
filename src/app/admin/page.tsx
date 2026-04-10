@@ -27,9 +27,48 @@ export default function AdminOverview() {
   const [marketIntelligence, setMarketIntelligence] = useState<MarketEquilibriumItem[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPredicting, setIsPredicting] = useState(false);
+  const [predictionData, setPredictionData] = useState<any>(null);
   
   // New Corporate Health Metrics (AI Driven)
   const healthMetrics = AI_ENGINE.analyzeCompanyHealth(recentActivity);
+
+  const handleAiPrediction = async () => {
+    setIsPredicting(true);
+    try {
+      const res = await fetch('/api/admin/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stats })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPredictionData(data.data);
+        toast.success("Strategic Prediction Generated", { icon: "🧠" });
+      }
+    } catch (e) { console.error(e); }
+    setIsPredicting(false);
+  };
+
+  const handleMentorAssignment = async (studentId: string, studentName: string) => {
+    try {
+      const res = await fetch('/api/admin/intervene', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: studentId, action: 'assign_mentor' })
+      });
+      const result = await res.json();
+      if (result.success) {
+        toast.success(`AI Mentor Assigned to ${studentName}`, { icon: '🤖' });
+        setAtRiskStudents(prev => prev.filter(s => s.student_id !== studentId));
+      } else {
+        toast.error("Intervention failed to persist.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Network error during intervention.");
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -87,16 +126,75 @@ export default function AdminOverview() {
 
   return (
     <div className="space-y-12">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Intelligence Dashboard</h1>
-        <p className="text-slate-500 font-medium tracking-tight">SkillSync Intelligence Ecosystem • Professional Governance Environment.</p>
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-1">
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Intelligence Dashboard</h1>
+          <p className="text-slate-500 font-medium tracking-tight">SkillSync Intelligence Ecosystem • Professional Governance Environment.</p>
+        </div>
+        <button 
+          onClick={handleAiPrediction}
+          disabled={isPredicting}
+          className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-600 transition-all shadow-xl flex items-center gap-3 active:scale-95 disabled:opacity-50"
+        >
+          <Cpu size={18} className={isPredicting ? "animate-spin" : ""} />
+          {isPredicting ? "Synthesizing..." : "Admin Strategic Predictor"}
+        </button>
       </header>
 
+      {predictionData && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+          className="p-12 rounded-[3.5rem] bg-slate-900 text-white border border-white/5 shadow-2xl relative overflow-hidden group"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-amber-600/10 via-transparent to-indigo-600/10 opacity-50 transition-opacity group-hover:opacity-100" />
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-12">
+            <div className="space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="size-2 rounded-full bg-amber-500 animate-ping" />
+                <span className="text-[10px] font-black uppercase tracking-[5px] text-white/50">Placement Velocity</span>
+              </div>
+              <div className="text-8xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/20">
+                {predictionData.predicted_success_rate}%
+              </div>
+              <p className="text-[10px] font-bold opacity-40 leading-relaxed uppercase tracking-[3px]">Cross-referenced against industrial growth benchmarks & skill saturation indices.</p>
+            </div>
+            
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div className="space-y-6">
+                <span className="text-[10px] font-black uppercase tracking-[5px] text-amber-500">Strategic Vectors</span>
+                <ul className="space-y-4">
+                  {(predictionData.recommendations || []).map((r: string, i: number) => (
+                    <li key={i} className="flex gap-4 text-[11px] font-medium leading-relaxed text-white/70 group/item">
+                      <span className="text-amber-600 font-black">0{i+1}</span>
+                      <span className="group-hover/item:text-white transition-colors">{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="space-y-6">
+                <span className="text-[10px] font-black uppercase tracking-[5px] text-rose-500">Stability Risks</span>
+                <ul className="space-y-4">
+                  {(predictionData.risk_factors || []).map((rk: string, i: number) => (
+                    <li key={i} className="flex gap-3 text-[11px] font-medium leading-relaxed text-rose-200/60 group/risk">
+                      <AlertTriangle size={14} className="shrink-0 text-rose-500" />
+                      <span className="group-hover/risk:text-rose-200 transition-colors">{rk}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* KPI Cards with 3D Perspective */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
         {kpiCards.map(stat => (
           <ThreeDCard key={stat.label} className="h-full">
-            <div className={`bg-white h-full p-8 rounded-[2rem] border ${stat.border} shadow-sm group hover:shadow-md transition-all`}>
+            <div 
+              onClick={() => stat.label === 'Partner Companies' ? router.push('/admin/companies') : null}
+              className={`bg-white h-full p-8 rounded-[2rem] border ${stat.border} shadow-sm group hover:shadow-md transition-all cursor-pointer`}
+            >
               <div className="flex items-center justify-between mb-6">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-[2px]">{stat.label}</div>
                 <div className={`size-9 rounded-xl ${stat.bg} flex items-center justify-center ${stat.color}`}>
@@ -110,6 +208,7 @@ export default function AdminOverview() {
           </ThreeDCard>
         ))}
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
@@ -215,13 +314,7 @@ export default function AdminOverview() {
                 </div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 italic">&quot;{student.reason}&quot;</p>
                 <button 
-                  onClick={() => {
-                    toast.success(`AI Mentor Assigned to ${student.name}`, { icon: '🤖' });
-                    // Globally activate mentorship flag for demo purposes
-                    localStorage.setItem('ai_mentorship_active', 'true');
-                    // Simulate system update in local view
-                    setAtRiskStudents(prev => prev.filter(s => s.student_id !== student.student_id));
-                  }}
+                  onClick={() => handleMentorAssignment(student.student_id, student.name)}
                   className="w-full py-2.5 rounded-xl bg-white text-black text-[9px] font-black uppercase tracking-[2px] opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center gap-2"
                 >
                   Assign AI Mentor <ArrowUpRight size={14} />

@@ -22,7 +22,7 @@ export default function Navbar() {
     window.addEventListener("scroll", handler, { passive: true });
     
     // Real-time Authentication Sync
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
       if (session) {
         // Fetch User Classification from Database
         const { data: profile } = await supabase

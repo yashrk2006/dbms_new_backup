@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -11,19 +11,66 @@ import AuthRoleCard from '@/components/auth/AuthRoleCard';
 import GsapMagnetic from '@/components/ui/GsapMagnetic';
 import { NeuralParticleField } from '@/components/ui/NeuralParticleField';
 
-type AuthStep = 'role' | 'identity' | 'verify' | 'otp' | 'success';
+type AuthStep = 'role' | 'identity' | 'verify' | 'otp' | 'credentials' | 'success';
 
 export default function LoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<AuthStep>('role');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start loading to check session
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   
   // Identity State
   const [rollNo, setRollNo] = useState('');
   const [studentData, setStudentData] = useState<any>(null);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState(''); // New: for registration
   const [otp, setOtp] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login'); // New: unified mode
+  const [companies, setCompanies] = useState<any[]>([]); // New: for directory
+  const [fetchingCompanies, setFetchingCompanies] = useState(false);
+
+  // ✅ DIRECT ACCESS GUARD
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // If already logged in, redirect to dashboard
+          router.push('/dashboard');
+        } else {
+          // No session — show the login UI
+          setLoading(false);
+        }
+      } catch {
+        // On error, still show the login UI
+        setLoading(false);
+      }
+    };
+    checkSession();
+  }, [router]);
+
+
+  // ✅ FETCH REGISTERED COMPANIES
+  useEffect(() => {
+    if (selectedRole === 'company' && authMode === 'login' && companies.length === 0) {
+      const fetchCompanies = async () => {
+        setFetchingCompanies(true);
+        try {
+          const res = await fetch('/api/auth/directory/companies');
+          const data = await res.json();
+          if (data.success) {
+            setCompanies(data.companies);
+          }
+        } catch (e) {
+          console.error('Failed to fetch corporate directory');
+        } finally {
+          setFetchingCompanies(false);
+        }
+      };
+      fetchCompanies();
+    }
+  }, [selectedRole, authMode, companies.length]);
 
   const roles = [
     {
@@ -54,27 +101,61 @@ export default function LoginPage() {
 
   const handleRoleSelect = (roleId: string) => {
     setSelectedRole(roleId);
+    setAuthMode('login'); // Default to login on role switch
     if (roleId === 'student') {
       setStep('identity');
     } else {
-      // Default to Google for Admin/Company for now, or expand as needed
-      handleGoogleAuth(roleId);
+      setStep('credentials');
     }
   };
 
-  const handleGoogleAuth = async (roleId: string) => {
+  const handleCredentialsAuth = async () => {
+    if (!email || !password) return toast.error('Email and Password required');
+    if (authMode === 'signup' && !name) return toast.error('Full Name required for registration');
+    
     setLoading(true);
-    document.cookie = `auth_role_intent=${roleId}; path=/; max-age=3600; SameSite=Lax`;
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/complete-profile`,
+    try {
+      if (authMode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        if (error) throw error;
+      } else {
+        // Sign Up via API
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name, type: selectedRole })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+        
+        // After signup, automatically sign in
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        if (signInError) throw signInError;
       }
-    });
 
-    if (error) {
-      toast.error(error.message);
+      toast.success(authMode === 'login' ? 'Access Granted • Synchronizing Dashboard' : 'Identity Created • Initializing Terminal');
+      setStep('success');
+      
+      const redirectMap: Record<string, string> = {
+        admin: '/admin',
+        company: '/company',
+        student: '/dashboard',
+      };
+      setTimeout(() => {
+        window.location.href = redirectMap[selectedRole || ''] || '/dashboard';
+      }, 1500);
+
+    } catch (error: any) {
+      const displayError = error.message || 'Institutional Authentication Failed. Please contact the Placement Cell.';
+      toast.error(displayError);
+    } finally {
       setLoading(false);
     }
   };
@@ -95,14 +176,16 @@ export default function LoginPage() {
         setStudentData(data.student);
         setStep('verify');
       } else {
-        toast.error(data.error || 'Student not found in institutional batch');
+        toast.error(data.error || 'Student record not found in verified institutional batch.');
       }
     } catch (e) {
-      toast.error('Identity server unreachable');
+      toast.error('Institutional identity server reached a connectivity limit.');
     } finally {
       setLoading(false);
     }
   };
+
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   const handleSendOTP = async () => {
       if (!email) return toast.error('Email required for verification');
@@ -117,13 +200,18 @@ export default function LoginPage() {
 
           const data = await res.json();
           if (data.success) {
+              // Auto-fill OTP from response (Institutional Auth Mode)
+              if (data.otp_code) {
+                  setOtp(data.otp_code);
+                  setDevOtp(data.otp_code);
+              }
               setStep('otp');
-              toast.success('Verification code dispatched to your email');
+              toast.success('Institutional verification code generated successfully.');
           } else {
-              toast.error(data.error);
+              toast.error(data.error || 'Failed to generate institutional verification session.');
           }
       } catch (e) {
-          toast.error('Failed to dispatch OTP');
+          toast.error('Failed to dispatch verification code. Please check your connection.');
       } finally {
           setLoading(false);
       }
@@ -150,7 +238,7 @@ export default function LoginPage() {
 
               if (signInError) throw signInError;
 
-              toast.success('Institutional Identity Synchronized');
+              toast.success('Institutional Identity Synchronized Successfully');
               setStep('success');
               
               // Force hard redirect to clear middleware cache
@@ -158,10 +246,10 @@ export default function LoginPage() {
                   window.location.href = '/dashboard';
               }, 1500);
           } else {
-              toast.error(data.error);
+              toast.error(data.error || 'Verification encountered an inconsistency.');
           }
-      } catch (e) {
-          toast.error('Verification failed');
+      } catch (e: any) {
+          toast.error(e.message || 'Identity synchronization failed.');
       } finally {
           setLoading(false);
       }
@@ -174,11 +262,17 @@ export default function LoginPage() {
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(234,88,12,0.03),transparent_50%)] -z-10" />
 
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-5xl relative z-10"
-      >
+      {loading && step === 'role' ? (
+        <div className="flex flex-col items-center gap-4 animate-pulse relative z-10">
+          <div className="w-16 h-16 border-4 border-orange-500/20 border-t-orange-500 rounded-full animate-spin" />
+          <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Synchronizing Identity...</p>
+        </div>
+      ) : (
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-5xl relative z-10"
+        >
         <div className="text-center mb-16">
           <GsapMagnetic>
             <Link href="/">
@@ -213,7 +307,7 @@ export default function LoginPage() {
                   onSelect={() => handleRoleSelect(role.id)}
                   onAuth={() => handleRoleSelect(role.id)}
                   loading={loading && selectedRole === role.id}
-                  type="login"
+                  type={authMode}
                 />
               ))}
             </motion.div>
@@ -303,13 +397,136 @@ export default function LoginPage() {
             </motion.div>
           )}
 
+          {step === 'credentials' && (
+            <motion.div 
+              key="credentials"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="max-w-md mx-auto bg-white rounded-3xl p-10 shadow-xl shadow-slate-200 border border-slate-100"
+            >
+               <div className="mb-8 flex flex-col items-center">
+                  <div className="size-16 rounded-2xl bg-slate-900 text-white flex items-center justify-center mb-6">
+                      <KeyRound size={32} />
+                  </div>
+                  <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+                    <button 
+                      onClick={() => setAuthMode('login')}
+                      className={`px-8 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${authMode === 'login' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Log In
+                    </button>
+                    <button 
+                      onClick={() => setAuthMode('signup')}
+                      className={`px-8 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${authMode === 'signup' ? 'bg-white text-slate-900 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      Register
+                    </button>
+                  </div>
+               </div>
+               
+               <h2 className="text-2xl font-black text-slate-900 text-center mb-2 uppercase tracking-tighter">
+                 {authMode === 'login' ? 'Secure Terminal Access' : 'Neural Profile Creation'}
+               </h2>
+               <p className="text-slate-500 text-center text-[10px] mb-10 uppercase tracking-[3px] font-bold">
+                 {authMode === 'login' ? `Authorized ${selectedRole} Entry Only` : `Institutional ${selectedRole} Onboarding`}
+               </p>
+               
+               <div className="space-y-6">
+                  {authMode === 'signup' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                    >
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Full Name / Entity Name</label>
+                      <input 
+                        type="text" 
+                        placeholder={selectedRole === 'company' ? 'e.g. Innovate Corp' : 'e.g. Dr. Adam Smith'}
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl px-6 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
+                      />
+                    </motion.div>
+                  )}
+
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Institutional Email</label>
+                    <input 
+                      type="email" 
+                      placeholder={selectedRole === 'admin' ? 'admin@institution.edu' : 'hiring@company.com'}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl px-6 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Access Password</label>
+                    <input 
+                      type="password" 
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl px-6 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 transition-all"
+                    />
+                  </div>
+                  <button 
+                    disabled={loading}
+                    onClick={handleCredentialsAuth}
+                    className="w-full h-14 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-amber-600 transition-all disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="animate-spin" /> : <>{authMode === 'login' ? 'Sync Credentials' : 'Initialize Profile'} <ArrowRight size={18} /></>}
+                  </button>
+                  
+                  {selectedRole === 'company' && authMode === 'login' && companies.length > 0 && (
+                    <div className="pt-8 mt-8 border-t border-slate-100">
+                      <p className="text-[10px] font-black uppercase tracking-[3px] text-slate-400 mb-6 text-center">Registered Neural Partners</p>
+                      <div className="grid grid-cols-2 gap-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                        {companies.map((corp) => (
+                           <button
+                             key={corp.email}
+                             onClick={() => {
+                               setEmail(corp.email);
+                               setPassword('company123456');
+                               toast.success(`Identity Selected: ${corp.company_name}`);
+                             }}
+                             className="group p-4 rounded-2xl border border-slate-100 bg-slate-50 hover:bg-white hover:border-amber-500 transition-all text-left"
+                           >
+                             <div className="flex items-center justify-between mb-2">
+                                <p className="text-[10px] font-black text-slate-900 uppercase truncate">{corp.company_name}</p>
+                                <Zap size={10} className="text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                             </div>
+                             <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{corp.industry}</p>
+                           </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button onClick={() => setStep('role')} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600">
+                    Switch Access Node
+                  </button>
+               </div>
+            </motion.div>
+          )}
+
           {step === 'otp' && (
             <motion.div 
               key="otp"
               className="max-w-md mx-auto bg-white rounded-3xl p-10 shadow-xl shadow-slate-200 border border-slate-100"
             >
-               <h2 className="text-2xl font-black text-slate-900 text-center mb-2">Verification Sent</h2>
-               <p className="text-slate-500 text-center text-xs mb-10">Check <span className="font-bold">{email}</span> for your 6-digit sync code.</p>
+               <h2 className="text-2xl font-black text-slate-900 text-center mb-2">Enter Verification Code</h2>
+               <p className="text-slate-500 text-center text-xs mb-6">Your one-time code has been generated and auto-filled below.</p>
+               
+               {/* Institutional Verification Code Banner */}
+               {devOtp && (
+                 <div className="mb-6 p-6 bg-slate-900 border border-slate-800 rounded-3xl text-center shadow-2xl relative overflow-hidden group">
+                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-emerald-500/10 opacity-50" />
+                   <div className="relative z-10">
+                    <p className="text-[9px] font-black uppercase tracking-[5px] text-white/40 mb-3">Institutional Verification Sync Code</p>
+                    <p className="text-4xl font-black tracking-[10px] text-white group-hover:scale-110 transition-transform duration-500">{devOtp}</p>
+                   </div>
+                 </div>
+               )}
                
                <div className="space-y-8">
                   <div className="flex justify-center">
@@ -318,7 +535,7 @@ export default function LoginPage() {
                       maxLength={6}
                       value={otp}
                       onChange={(e) => setOtp(e.target.value)}
-                      placeholder="000 000"
+                      placeholder="000000"
                       className="w-full h-20 text-center text-4xl font-black tracking-[12px] bg-slate-50 border border-slate-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"
                     />
                   </div>
@@ -356,6 +573,7 @@ export default function LoginPage() {
           </p>
         </div>
       </motion.div>
-    </div>
-  );
+    )}
+  </div>
+);
 }

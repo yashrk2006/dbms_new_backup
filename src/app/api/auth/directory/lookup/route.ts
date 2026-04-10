@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getFriendlyErrorMessage } from '@/lib/error-adapter';
 
 /**
  * Institutional Identity Lookup
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
     const { identifier } = await request.json();
 
     if (!identifier) {
-      return NextResponse.json({ error: 'Roll Number or Enrollment ID required' }, { status: 400 });
+      return NextResponse.json({ error: 'Institutional Roll Number or Enrollment ID is required for access.' }, { status: 400 });
     }
 
     // Query the Institutional Directory (bypassing RLS with Admin client)
@@ -20,15 +21,15 @@ export async function POST(request: Request) {
       .or(`roll_no.eq."${identifier}",enrollment_no.eq."${identifier}"`)
       .single();
 
-    if (error) {
-      console.error('❌ Database Query Error:', error.message);
-    }
-
     if (error || !data) {
-      console.warn('❌ Institutional lookup failed for:', identifier);
-      return NextResponse.json({ 
-        error: error?.message || 'Record not found in the verified institutional batch directory.' 
-      }, { status: 404 });
+      console.warn('❌ Institutional lookup sync failure for:', identifier);
+      
+      // Standardize the not-found error
+      const errorMessage = (error && error.code !== 'PGRST116') 
+        ? getFriendlyErrorMessage(error)
+        : 'Record not found in the verified institutional batch directory.';
+
+      return NextResponse.json({ error: errorMessage }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -44,10 +45,9 @@ export async function POST(request: Request) {
     });
 
   } catch (error: any) {
-    console.error('❌ Lookup Error:', error.message || error);
+    console.error('❌ Lookup Critical Crash:', error.message || error);
     return NextResponse.json({ 
-        error: 'Internal server error',
-        details: error.message || 'Unknown error'
+        error: getFriendlyErrorMessage(error)
     }, { status: 500 });
   }
 }

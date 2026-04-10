@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 
 export async function GET(request: Request) {
   try {
@@ -10,13 +10,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Company ID is required' }, { status: 400 });
     }
 
-    // Fetch company internships with application counts and requirements
+    // Fetch company internships with application counts and requirements (singular join)
     const { data: internships, error } = await supabase
       .from('internship')
       .select(`
         *,
         application(status),
-        internship_requirements(skill(skill_id, skill_name))
+        internship_skill(skill(skill_id, skill_name))
       `)
       .eq('company_id', companyId)
       .order('internship_id', { ascending: false });
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       id: job.internship_id.toString(),
       application: job.application || [],
       requirements: {
-          role_skills: job.internship_requirements?.map((ir: any) => ir.skill.skill_name) || []
+          role_skills: job.internship_skill?.map((ir: any) => ir.skill.skill_name) || []
       }
     }));
 
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 1. Insert Internship (internship_id is SERIAL)
+    // 1. Insert Internship
     const { data: internship, error: internError } = await supabase
       .from('internship')
       .insert({
@@ -64,21 +64,37 @@ export async function POST(request: Request) {
 
     if (internError) throw internError;
 
-    // 2. Insert Skills into internship_requirements junction table
-    if (skills && skills.length > 0) {
-      // Find skill IDs for the provided skill names
-      const { data: skillItems } = await supabase
-        .from('skill')
-        .select('skill_id, skill_name')
-        .in('skill_name', skills);
+    // 2. Insert Skills into internship_skill (with Auto-Discovery)
+    if (skills && Array.isArray(skills) && skills.length > 0) {
+      const skillsToLink = [];
 
-      if (skillItems && skillItems.length > 0) {
-        const requirements = skillItems.map(s => ({
-          internship_id: internship.internship_id,
-          skill_id: s.skill_id
-        }));
+      for (const skillName of skills) {
+        // Find or create the skill
+        let { data: skillObj } = await supabase
+          .from('skill')
+          .select('skill_id')
+          .ilike('skill_name', skillName)
+          .single();
 
-        await supabase.from('internship_requirements').insert(requirements);
+        if (!skillObj) {
+          const { data: newSkill } = await supabase
+            .from('skill')
+            .insert({ skill_name: skillName })
+            .select('skill_id')
+            .single();
+          if (newSkill) skillObj = newSkill;
+        }
+
+        if (skillObj) {
+          skillsToLink.push({
+            internship_id: internship.internship_id,
+            skill_id: skillObj.skill_id
+          });
+        }
+      }
+
+      if (skillsToLink.length > 0) {
+        await supabase.from('internship_skill').insert(skillsToLink);
       }
     }
 

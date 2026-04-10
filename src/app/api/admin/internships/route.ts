@@ -10,14 +10,14 @@ export async function GET() {
         *,
         company(company_name),
         application(count),
-        internship_requirements(count)
+        internship_skill(count)
       `);
 
     if (error) throw error;
 
     const enriched = (internships || []).map((i: any) => {
       const appCount = i.application?.[0]?.count || 0;
-      const reqCount = i.internship_requirements?.[0]?.count || 0;
+      const reqCount = i.internship_skill?.[0]?.count || 0;
       
       // AI Heuristic: Calculate Role Health
       // Critical Role: < 2 apps after some time (simulated)

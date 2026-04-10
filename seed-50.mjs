@@ -101,7 +101,7 @@ async function run() {
 
     for (const skillId of selectedSkills) {
       await client.query(`
-        INSERT INTO internship_requirements (internship_id, skill_id)
+        INSERT INTO internship_skill (internship_id, skill_id)
         VALUES ($1, $2)
         ON CONFLICT DO NOTHING;
       `, [internshipId, skillId]);

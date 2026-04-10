@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { getFriendlyErrorMessage } from '@/lib/error-adapter';
 import pg from 'pg';
 
 /**
@@ -15,7 +16,10 @@ export async function POST(request: Request) {
     const otp = body.otp?.trim();
 
     if (!roll_no || !email || !otp) {
-      return NextResponse.json({ error: 'Roll Number, email, and OTP required' }, { status: 400 });
+      return NextResponse.json({ 
+        success: false,
+        error: "Roll Number, email, and verification code are required."
+      }, { status: 400 });
     }
 
     console.log('🔍 Attempting Verification [Permanent Access Handshake]:', { roll_no, email, otp });
@@ -37,7 +41,10 @@ export async function POST(request: Request) {
 
     if (otpError || !otpRecord) {
       console.warn('❌ OTP Verification Failed Details:', { found: !!otpRecord, roll_no, email, otp });
-      return NextResponse.json({ error: 'Invalid or expired verification code' }, { status: 401 });
+      return NextResponse.json({ 
+        success: false,
+        error: "Invalid or expired verification code." 
+      }, { status: 401 });
     }
 
     // 2. Fetch Institutional Batch Data
@@ -50,15 +57,19 @@ export async function POST(request: Request) {
 
     if (dirError || !directoryData) {
       console.error('❌ Directory Lookup Error:', dirError?.message);
-      return NextResponse.json({ error: 'Failed to synchronize institutional data' }, { status: 500 });
+      return NextResponse.json({ 
+        success: false,
+        error: "Failed to synchronize institutional data. Record not found." 
+      }, { status: 404 });
     }
 
     // 3. DIRECT SQL IDENTITY DISCOVERY
     if (!process.env.DATABASE_URL) {
       console.error('❌ Missing DATABASE_URL in Vercel Environment');
       return NextResponse.json({ 
-        error: 'Database configuration missing in Vercel',
-        diagnostic: 'Check Vercel Environment Variables: DATABASE_URL is undefined.'
+        success: false,
+        error: 'Institutional synchronization service is unavailable.',
+        diagnostic: 'Check DATABASE_URL configuration.'
       }, { status: 500 });
     }
 
@@ -79,14 +90,10 @@ export async function POST(request: Request) {
     } catch (pgErr: any) {
       console.error('❌ Direct SQL Bypass Failed:', pgErr.message);
       
-      const isDnsError = pgErr.code === 'ENOTFOUND' || pgErr.message?.includes('ENOTFOUND');
-      
       return NextResponse.json({ 
-        error: isDnsError ? 'Database Identity DNS Blocked' : 'Database connection failed in production',
-        details: pgErr.message,
-        diagnostic: isDnsError 
-          ? 'CRITICAL: Port 5432 (Direct) is failing DNS on Vercel. Switch DATABASE_URL in Vercel to Port 6543 (Pooler) and add ?sslmode=require.'
-          : 'Ensure DATABASE_URL in Vercel includes ?sslmode=require and uses the Transaction Pooler (Port 6543).'
+        success: false,
+        error: getFriendlyErrorMessage(pgErr),
+        details: pgErr.message
       }, { status: 500 });
     }
 
@@ -104,9 +111,9 @@ export async function POST(request: Request) {
       if (createError) {
         console.error('❌ Auth Creation Error:', createError.message);
         return NextResponse.json({ 
-          error: 'Failed to create institutional identity',
-          details: createError.message,
-          code: createError.status 
+          success: false,
+          error: "Institutional identity creation failed.",
+          details: createError.message
         }, { status: 500 });
       }
       authUser = newUser.user;
@@ -122,9 +129,9 @@ export async function POST(request: Request) {
       if (updateError) {
         console.error('❌ Identity Hardening Error:', updateError.message);
         return NextResponse.json({ 
-          error: 'Failed to authorize institutional role',
-          details: updateError.message,
-          code: updateError.status
+          success: false,
+          error: "Institutional authorization update failed.",
+          details: updateError.message
         }, { status: 500 });
       }
     }
@@ -132,18 +139,29 @@ export async function POST(request: Request) {
     // 5. Institutional Profile Synchronization (Postgres Table)
     if (directoryData.role === 'student' && authUser) {
       try {
-        await supabaseAdmin
+        const { error: syncErr } = await supabaseAdmin
           .from('student')
           .upsert({
             student_id: authUser.id,
             name: directoryData.name,
+            roll_no: directoryData.roll_no,
             email: email,
-            college: 'Institutional Batch 2024',
-            branch: directoryData.branch || directoryData.course,
-            graduation_year: directoryData.batch_year + 4, 
+            college: 'Institutional Partner',
+            branch: directoryData.course,
+            graduation_year: (directoryData.batch_year || 2024) + 3,
           });
-      } catch (syncErr: any) {
-        console.error('❌ Profile Sync Crash (Non-Blocking):', syncErr.message);
+
+        if (!syncErr) {
+          // Inject Welcome Notification to ensure dashboard has live data
+          await supabaseAdmin.from('notification').insert([{
+            user_id: authUser.id,
+            title: "Verification Successful 🎓",
+            message: `Confirmed as Roll No: ${directoryData.roll_no}. Your institutional profile is now active.`,
+            type: 'system'
+          }]);
+        }
+      } catch (err: any) {
+        console.error('❌ Profile Sync Crash (Non-Blocking):', err.message);
       }
     }
 
@@ -162,6 +180,10 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('❌ Verification Crash:', error.message || error);
-    return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 });
+    return NextResponse.json({ 
+      success: false,
+      error: getFriendlyErrorMessage(error),
+      details: error.message 
+    }, { status: 500 });
   }
 }

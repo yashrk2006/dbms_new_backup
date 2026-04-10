@@ -12,7 +12,7 @@ export async function GET() {
       { data: companiesRaw }
     ] = await Promise.all([
       supabase.from('student').select('student_id, student_skill(skill(skill_name))'),
-      supabase.from('internship').select('internship_id, internship_requirements(skill(skill_name))'),
+      supabase.from('internship').select('internship_id, internship_skill(skill(skill_name))'),
       supabase.from('application').select('status, applied_date'),
       supabase.from('company').select('company_id', { count: 'exact', head: true })
     ]);
@@ -33,14 +33,14 @@ export async function GET() {
     });
 
     const placementVelocity = last6Months.map(month => {
-      const monthApps = applications.filter(a => {
+      const monthApps = applications.filter((a: any) => {
         const d = new Date(a.applied_date);
         return monthNames[d.getMonth()] === month;
       });
       return {
         month,
         applications: monthApps.length,
-        placements: monthApps.filter(a => a.status === 'Accepted').length
+        placements: monthApps.filter((a: any) => a.status === 'Accepted').length
       };
     });
 
@@ -56,7 +56,7 @@ export async function GET() {
     });
 
     internships.forEach((i: any) => {
-      i.internship_requirements?.forEach((ir: any) => {
+      i.internship_skill?.forEach((ir: any) => {
         const name = ir.skill.skill_name;
         skillDemandMap[name] = (skillDemandMap[name] || 0) + 1;
       });
@@ -75,9 +75,9 @@ export async function GET() {
 
     // 4. Status Distribution
     const statusCounts = {
-      Placed: applications.filter(a => a.status === 'Accepted').length,
-      Interviewing: applications.filter(a => a.status === 'Interviewing').length,
-      Searching: students.length - applications.filter(a => a.status === 'Accepted').length
+      Placed: applications.filter((a: any) => a.status === 'Accepted').length,
+      Interviewing: applications.filter((a: any) => a.status === 'Interviewing').length,
+      Searching: students.length - applications.filter((a: any) => a.status === 'Accepted').length
     };
 
     const statusDistribution = [
@@ -92,7 +92,7 @@ export async function GET() {
         totalStudents: students.length,
         totalCompanies: totalCompanies,
         totalInternships: internships.length,
-        activePlacements: applications.filter(a => a.status === 'Accepted').length
+        activePlacements: applications.filter((a: any) => a.status === 'Accepted').length
       },
       placementData: placementVelocity,
       skillDemand: skillGaps,

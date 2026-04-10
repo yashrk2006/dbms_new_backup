@@ -30,85 +30,84 @@
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
 
-  /* Specific Brand Colors - Refined Professional */
-  --color-amber-700: #b45309;
-  --color-amber-600: #d97706;
-  --color-amber-500: #f59e0b;
-  --color-slate-900: #0f172a;
-  --color-slate-800: #1e293b;
-  --color-slate-100: #f1f5f9;
+  /* Alvance Specific Palette */
+  --color-surface-container: #ebeef0;
+  --color-surface-container-low: #f1f4f5;
+  --color-surface-container-lowest: #ffffff;
+  --color-primary-alvance: #575a93;
+  --color-secondary-alvance: #31638a;
+  --color-tertiary-alvance: #7d5817;
 
-  /* Fonts - Professional Clean */
-  --font-serif: var(--font-display), serif;
-  --font-body: "Public Sans", sans-serif;
-  --font-display: "Inter", sans-serif;
-  --font-mono: "DM Mono", monospace;
+  /* Fonts - Plus Jakarta Sans Ecosystem */
+  --font-sans: var(--font-plus-jakarta), sans-serif;
+  --font-mono: var(--font-mono), monospace;
 
-  /* Custom Radii to match reference variable */
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  /* Premium Radii */
+  --radius-lg: 1.8rem;
+  --radius-md: 1.4rem;
+  --radius-sm: 0.8rem;
 }
 
 :root {
-  /* Premium Light Palette - Clean Corporate Slate & Amber */
-  --background: 210 40% 98%; /* Slate 50 */
-  --foreground: 222 47% 11%; /* Slate 950 */
+  /* Alvance Luminous Palette */
+  --background: 210 20% 98%; /* Soft #F8F9FA base */
+  --foreground: 210 8% 20%; /* Hard Authoritative Ink */
   
   --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card-foreground: 210 8% 20%;
   
-  --primary: 38 92% 50%; /* Amber 600 */
-  --primary-foreground: 210 40% 98%;
+  --primary: 237 25% 46%; /* Authoritative #575A93 */
+  --primary-foreground: 210 20% 98%;
   
-  --secondary: 215 25% 27%; /* Slate 700 */
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 206 48% 37%; /* Corporate #31638A */
+  --secondary-foreground: 210 20% 98%;
 
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted: 210 14% 94%;
+  --muted-foreground: 210 8% 45%;
   
-  --accent: 38 92% 50%;
-  --accent-foreground: 222.2 47.4% 11.2%;
+  --accent: 38 70% 28%; /* Tertiary #7D5817 */
+  --accent-foreground: 210 20% 98%;
   
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 38 92% 50%;
+  /* The "No-Line" Separation Rule */
+  --border: 210 14% 92%; /* Extremely subtle, matches surface-container */
+  --input: 210 14% 92%;
+  --ring: 237 25% 46%;
   
-  --radius: 0.75rem;
+  --radius: 1.8rem;
 
-  /* Premium Glassmorphism Light */
-  --glass-bg: rgba(255, 255, 255, 0.8);
-  --glass-border: rgba(15, 23, 42, 0.08);
-  --glass-shadow: 0 8px 32px 0 rgba(15, 23, 42, 0.05);
+  /* Premium Glassmorphism (Digital Curator Variant) */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(87, 90, 147, 0.05);
+  --glass-shadow: 0 20px 40px rgba(45, 51, 53, 0.06);
 }
 
 .dark {
-  /* Forced Light-ish for Dark Mode to respect "no dark theme" */
-  --background: 210 20% 96%;
-  --foreground: 222 47% 11%;
+  /* Alvance Dark (Tonal Inversion) */
+  --background: 222 47% 11%;
+  --foreground: 210 20% 98%;
   
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
+  --card: 222 47% 15%;
+  --card-foreground: 210 20% 98%;
   
-  --primary: 38 92% 50%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 237 60% 70%; /* Soft #9395D3 */
+  --primary-foreground: 222 47% 11%;
   
-  --secondary: 215 25% 27%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary: 206 48% 60%;
+  --secondary-foreground: 222 47% 11%;
 
-  --muted: 210 20% 90%;
-  --muted-foreground: 215 16% 47%;
+  --muted: 222 47% 20%;
+  --muted-foreground: 210 20% 70%;
   
-  --accent: 38 92% 50%;
-  --accent-foreground: 0 0% 100%;
+  --accent: 38 70% 60%;
+  --accent-foreground: 222 47% 11%;
   
-  --border: 215 20% 85%;
-  --input: 215 20% 85%;
-  --ring: 38 92% 50%;
+  --border: 222 47% 20%;
+  --input: 222 47% 20%;
+  --ring: 237 60% 70%;
 
-  --glass-bg: rgba(255, 255, 255, 0.85);
-  --glass-border: rgba(0, 0, 0, 0.05);
-  --glass-shadow: 0 4px 32px 0 rgba(0, 0, 0, 0.05);
+  --glass-bg: rgba(15, 23, 42, 0.7);
+  --glass-border: rgba(147, 149, 211, 0.05);
+  --glass-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
 @layer base {
@@ -116,76 +115,58 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground antialiased selection:bg-amber-500/30 transition-colors duration-300;
-    font-family: var(--font-body);
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 transition-colors duration-500;
+    font-family: var(--font-sans);
   }
-  /* Remove global italics for professional authoritative look */
-  .italic, em, i {
-    font-style: normal !important;
+  /* Authoritative Headers */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight text-foreground;
   }
 }
 
-/* Reference Utility Classes */
-.glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(24px);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-  @apply transition-all duration-300;
+/* Alvance Utility Classes */
+.curator-card {
+  @apply bg-white dark:bg-slate-900 border border-transparent shadow-[0px_20px_40px_rgba(45,51,53,0.06)] rounded-[1.8rem] transition-all duration-500 hover:shadow-[0px_30px_60px_rgba(45,51,53,0.1)] active:scale-[0.98];
 }
 
-.bg-mesh-gradient {
+.tonal-separation {
+  @apply bg-surface-container dark:bg-slate-800/50;
+}
+
+.glass-bottom-nav {
+  @apply fixed bottom-0 left-0 w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border-t border-white/10 shadow-[0px_-10px_40px_rgba(45,51,53,0.06)] z-50 rounded-t-[2.5rem];
+}
+
+.mesh-glow {
   background-attachment: fixed;
   background-image: 
-    radial-gradient(at 0% 0%, hsla(var(--primary), 0.08) 0, transparent 50%),
-    radial-gradient(at 50% 0%, hsla(var(--secondary), 0.06) 0, transparent 50%),
-    radial-gradient(at 100% 0%, hsla(var(--primary), 0.08) 0, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(87, 90, 147, 0.05) 0, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(49, 99, 138, 0.05) 0, transparent 50%);
 }
 
-.bg-grid-pattern {
-  background-size: 60px 60px;
-  background-image: 
-    linear-gradient(to right, hsla(var(--foreground), 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, hsla(var(--foreground), 0.03) 1px, transparent 1px);
+/* Scroll Premium - Minimalist */
+.scroll-alvance::-webkit-scrollbar {
+  width: 4px;
 }
-
-.gradient-text {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700;
+.scroll-alvance::-webkit-scrollbar-track {
+  @apply bg-transparent;
 }
-
-/* Supplemental Architecture Utilities */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(1, minmax(0, 1fr));
-  gap: 1rem;
+.scroll-alvance::-webkit-scrollbar-thumb {
+  @apply bg-primary/10 rounded-full;
 }
-
-@media (min-width: 1024px) {
-  .dashboard-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.scroll-alvance::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary/20;
 }
-
-.compact-card {
-  @apply p-4 rounded-2xl border border-border bg-card/50 backdrop-blur-md shadow-lg;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
 }
-
-.data-row {
-  @apply py-3 border-b border-border/40 last:border-0 flex items-center justify-between gap-4;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-.text-gold {
-  color: var(--color-amber-500);
-}
-
-.scroll-premium::-webkit-scrollbar {
-  width: 6px;
-}
-.scroll-premium::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.05);
-}
-.scroll-premium::-webkit-scrollbar-thumb {
-  background: rgba(217, 119, 6, 0.2);
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
   border-radius: 10px;
 }
-.scroll-premium::-webkit-scrollbar-thumb:hover {
-  background: rgba(217, 119, 6, 0.4);
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }

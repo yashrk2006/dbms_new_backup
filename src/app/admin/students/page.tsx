@@ -6,17 +6,19 @@ import {
   MoreVertical, Mail, BookOpen, Target,
   TrendingUp, Award, AlertCircle, CheckCircle2,
   ChevronRight, ArrowUpRight, LayoutGrid, List,
-  Database, Activity
+  Database, Activity, FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Student {
   student_id: string;
   name: string;
+  roll_no?: string;
   email: string;
   college: string;
   branch: string;
   academic_year: string;
+  resume_url?: string;
   student_skill?: { skill_name: string; level: string }[];
 }
 
@@ -46,7 +48,8 @@ export default function AdminStudentsPage() {
   const filtered = students.filter(s => 
     s.name?.toLowerCase().includes(search.toLowerCase()) ||
     s.college?.toLowerCase().includes(search.toLowerCase()) ||
-    s.branch?.toLowerCase().includes(search.toLowerCase())
+    s.branch?.toLowerCase().includes(search.toLowerCase()) ||
+    s.roll_no?.toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) return (
@@ -157,8 +160,8 @@ export default function AdminStudentsPage() {
                     <span className="text-xl font-black">{s.name?.charAt(0) || 'S'}</span>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-[3px] mb-1">Batch ID</span>
-                    <span className="text-[10px] font-bold text-slate-400 font-mono">#{s.student_id.slice(0, 8)}</span>
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-[3px] mb-1">Institutional ID</span>
+                    <span className="text-[10px] font-bold text-slate-400 font-mono">{s.roll_no || 'N/A'}</span>
                   </div>
                 </div>
 
@@ -202,7 +205,16 @@ export default function AdminStudentsPage() {
                       <BookOpen size={14} className="text-amber-600/40" />
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[2px] line-clamp-1">{s.college || 'Career Institute'}</span>
                    </div>
-                   <ChevronRight size={16} className="text-slate-200 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
+                   {s.resume_url ? (
+                     <button 
+                       onClick={() => window.open(s.resume_url, '_blank')}
+                       className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center gap-1.5 transition-colors text-[9px] font-black uppercase tracking-widest border border-emerald-100"
+                     >
+                       <FileText size={12} /> Resume
+                     </button>
+                   ) : (
+                     <ChevronRight size={16} className="text-slate-200 group-hover:text-amber-600 group-hover:translate-x-1 transition-all" />
+                   )}
                 </div>
               </motion.div>
             ))}
@@ -230,7 +242,7 @@ export default function AdminStudentsPage() {
                             </div>
                             <div>
                                <div className="text-sm font-black text-slate-900 uppercase tracking-tight">{s.name}</div>
-                               <div className="text-[10px] font-bold text-slate-400">{s.email}</div>
+                               <div className="text-[10px] font-bold text-slate-400">{s.roll_no || 'No ID'} • {s.email}</div>
                             </div>
                          </div>
                       </td>
@@ -254,7 +266,16 @@ export default function AdminStudentsPage() {
                         </span>
                       </td>
                       <td className="px-8 py-6 text-right">
-                         <button className="p-2 rounded-lg text-slate-300 hover:text-slate-900 transition-colors">
+                         {s.resume_url && (
+                           <button 
+                             onClick={() => window.open(s.resume_url, '_blank')}
+                             className="p-2 rounded-lg text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 transition-colors mr-2 inline-flex"
+                             title="View Resume"
+                           >
+                              <FileText size={18} />
+                           </button>
+                         )}
+                         <button className="p-2 rounded-lg text-slate-300 hover:text-slate-900 transition-colors inline-flex">
                             <MoreVertical size={18} />
                          </button>
                       </td>

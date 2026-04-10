@@ -3,49 +3,31 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
-  Search, Calendar, DollarSign, Target, ShieldCheck, Activity, 
-  Cpu, Zap, Globe, Database, Terminal, Lightbulb, Sparkles 
+  Briefcase, Search, Filter, MapPin, Clock, DollarSign, 
+  ChevronRight, Star, Globe, Target, Zap, Activity, 
+  Sparkles, Brain, Cpu, ShieldCheck, Terminal, GraduationCap, X, 
+  Calendar, FileText, Link as LinkIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Internship, Application } from '@/types';
+import PremiumCard from '@/components/ui/PremiumCard';
 import AnimatedSection from '@/components/ui/AnimatedSection';
-import { toast } from 'react-hot-toast';
 import { AI_ENGINE } from '@/lib/ai-engine';
 import { supabase } from '@/lib/supabase';
-
-interface Internship {
-  id: string;
-  internship_id: number;
-  title: string;
-  company_name: string;
-  description: string;
-  duration: string;
-  stipend: string;
-  location: string;
-  company_id: string;
-  required_skills: string[];
-  missing_skills: string[];
-  match_percentage: number;
-  applied: boolean;
-  success_probability?: number;
-  match_diagnosis?: {
-    matched: string[];
-    missing: string[];
-    scarcity: { name: string, is_rare: boolean }[];
-  };
-}
+import { toast } from 'react-hot-toast';
 
 export default function InternshipsPage() {
   const router = useRouter();
   const [internships, setInternships] = useState<Internship[]>([]);
+  const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [mySkills, setMySkills] = useState<string[]>([]);
-  const [now, setNow] = useState<number>(0);
-  const [aiInterviewModal, setAiInterviewModal] = useState<{ open: boolean; title: string; questions: string[]; isLoading: boolean }>({
+  const [now, setNow] = useState(Date.now());
+  const [aiInterviewModal, setAiInterviewModal] = useState({
     open: false,
     title: '',
-    questions: [],
+    questions: [] as string[],
     isLoading: false
   });
 
@@ -94,7 +76,11 @@ export default function InternshipsPage() {
             success_probability: probability,
             match_diagnosis: diagnosis
           };
-        }).sort((a: Internship, b: Internship) => b.match_percentage - a.match_percentage);
+        }).sort((a: Internship, b: Internship) => {
+          const scoreA = a.match_percentage || 0;
+          const scoreB = b.match_percentage || 0;
+          return scoreB - scoreA;
+        });
         
         setInternships(mapped);
       }
@@ -131,14 +117,15 @@ export default function InternshipsPage() {
     }
   };
 
-  // Skill Evolution Predictor Logic
   const evolutionData = useMemo(() => {
     if (internships.length === 0) return [];
     const skillMarketPresence: Record<string, number> = {};
     internships.forEach(i => {
-      i.missing_skills.forEach(skill => {
-        skillMarketPresence[skill] = (skillMarketPresence[skill] || 0) + 1;
-      });
+      if (i.missing_skills) {
+        i.missing_skills.forEach(skill => {
+          skillMarketPresence[skill] = (skillMarketPresence[skill] || 0) + 1;
+        });
+      }
     });
 
     return Object.entries(skillMarketPresence)
@@ -159,18 +146,15 @@ export default function InternshipsPage() {
     const userId = session?.user?.id;
     if (!userId) {
       toast.error("Authentication required for application.");
-      return;
-    }
-    if (!userId) {
-      toast.error('Session expired. Please login again.');
       router.push('/auth/login');
+      setApplying(null);
       return;
     }
 
     const toastId = toast.loading(`Syndicating application for ${internship.title}...`);
 
     try {
-      const response = await fetch('/api/applications', {
+      const response = await fetch('/api/application-submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -181,7 +165,8 @@ export default function InternshipsPage() {
       const result = await response.json();
       
       if (result.success) {
-        toast.success(`Application successful! Match Score: ${internship.match_percentage}%`, { id: toastId });
+        const pitch = result.data.ai_pitch ? `AI Pitch: "${result.data.ai_pitch.substring(0, 50)}..."` : `Match Score: ${internship.match_percentage}%`;
+        toast.success(`Application Syndicated! ${pitch}`, { id: toastId, duration: 5000 });
         await load();
       } else {
         toast.error(result.error || 'Failed to syndicate application.', { id: toastId });
@@ -221,7 +206,7 @@ export default function InternshipsPage() {
              </div>
              <h2 className="text-[10px] font-black uppercase tracking-[8px] text-slate-500">Career Portal — Internship Search</h2>
           </div>
-          <h1 className="text-5xl md:text-7xl font-black text-slate-950 tracking-tight uppercase leading-[0.9] mb-6">
+          <h1 className="text-4xl md:text-7xl font-black text-slate-950 tracking-tight uppercase leading-[0.9] mb-6">
             Internship<br />
             <span className="text-amber-600">Listings.</span>
           </h1>
@@ -231,7 +216,7 @@ export default function InternshipsPage() {
           </div>
         </AnimatedSection>
         
-        <AnimatedSection direction="up" className="relative w-full lg:w-[450px] group" delay={0.2}>
+        <AnimatedSection direction="up" className="relative w-full lg:max-w-md group" delay={0.2}>
           <div className="absolute inset-0 bg-amber-500/5 blur-2xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
           <input
             id="internship-search"
@@ -245,262 +230,272 @@ export default function InternshipsPage() {
         </AnimatedSection>
       </div>
 
-      {evolutionData.length > 0 && (
-        <AnimatedSection direction="up" delay={0.3}>
-          <div className="bg-slate-950 rounded-[3rem] p-10 relative overflow-hidden group/evolution border border-white/5">
-            <div className="absolute top-0 right-0 p-12 opacity-10 group-hover/evolution:scale-110 transition-transform duration-700">
-              <Activity size={120} className="text-amber-500" />
-            </div>
-            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-              <div className="lg:col-span-5 space-y-6">
-                <div className="flex items-center gap-3">
-                  <div className="size-8 rounded-xl bg-amber-500 text-black flex items-center justify-center">
-                    <Zap size={16} fill="currentColor" />
-                  </div>
-                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-[5px]">Predictive Analytics</span>
-                </div>
-                <h3 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">Skill Evolution<br />Predictor.</h3>
-                <p className="text-[11px] font-medium text-slate-400 uppercase tracking-[2px] leading-relaxed">
-                  Our AI has analyzed the current market. Acquiring these top missing skills will maximize your matching probability across all active listings.
-                </p>
-              </div>
-              <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-3 gap-4">
-                {evolutionData.map((skill, idx) => (
-                  <div key={skill.name} className="bg-white/5 border border-white/10 p-6 rounded-[2rem] hover:bg-white/10 transition-all group/item">
-                    <div className="flex justify-between items-start mb-4">
-                      <span className="text-[9px] font-black text-amber-500 uppercase tracking-[2px]">High Impact</span>
-                      <span className="text-[10px] font-black text-white/20">0{idx+1}</span>
-                    </div>
-                    <div className="text-lg font-black text-white uppercase tracking-tighter mb-1">{skill.name}</div>
-                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-[2px] mb-6">+{skill.impact}% Market Reach</div>
-                    <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                      <motion.div initial={{ width: 0 }} whileInView={{ width: `${skill.impact}%` }} transition={{ duration: 1, delay: 0.5 + (idx * 0.1) }} className="h-full bg-amber-500" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+      {filtered.length === 0 ? (
+        <AnimatedSection direction="up" className="flex flex-col items-center justify-center py-24 gap-8">
+           <div className="size-24 rounded-[2rem] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
+              <Search size={40} />
+           </div>
+           <div className="text-center space-y-2">
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">No Opportunities Found</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[3px]">The Neural Engine could not locate matches for &quot;{search}&quot;</p>
+           </div>
+           <button 
+             onClick={() => { setSearch(''); load(); }}
+             className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[4px] hover:bg-amber-600 transition-all shadow-xl active:scale-95"
+           >
+              Reset Search Grid
+           </button>
         </AnimatedSection>
-      )}
-
-      <div className="space-y-12">
-        <AnimatePresence mode="popLayout">
-          {filtered.map((i, index) => {
-            const isTopMatch = i.match_percentage >= 80;
-            return (
-              <AnimatedSection key={i.id} delay={index * 0.05} direction="up">
-                <div className="group relative bg-white rounded-[2.5rem] border border-slate-100 hover:border-amber-200 transition-all duration-700 overflow-hidden flex flex-col lg:flex-row shadow-sm hover:shadow-xl">
-                  <div className={`lg:w-72 p-12 flex flex-col items-center justify-center gap-8 text-center transition-all duration-700 relative border-b lg:border-b-0 lg:border-r border-slate-100 ${
-                    i.match_percentage >= 80 ? "bg-amber-600/[0.03]" : i.match_percentage >= 50 ? "bg-amber-500/[0.03]" : "bg-slate-50"
-                  }`}>
-                    <div className="relative group/score">
-                       <div className="absolute -inset-4 bg-amber-600/5 blur-2xl rounded-full opacity-0 group-hover/score:opacity-100 transition-opacity duration-700" />
-                       <svg className="size-32 transform -rotate-90 relative z-10">
-                         <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-slate-100" />
-                         <motion.circle
-                           cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="6" fill="transparent"
-                           strokeDasharray={364.4}
-                           initial={{ strokeDashoffset: 364.4 }}
-                           whileInView={{ strokeDashoffset: 364.4 - (364.4 * i.match_percentage) / 100 }}
-                           transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-                           className={i.match_percentage >= 80 ? "text-amber-600" : i.match_percentage >= 50 ? "text-amber-500" : "text-slate-300"}
-                         />
-                       </svg>
-                       <div className="absolute inset-0 flex flex-col items-center justify-center group-hover/score:scale-110 transition-transform duration-500 z-20">
-                         <span className="text-4xl font-black text-slate-900 tracking-tighter">{i.match_percentage}<span className="text-lg opacity-30">%</span></span>
-                         <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-400">Match</span>
-                         {/* Tactical HUD Overlay */}
-                         <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.05)_50%),linear-gradient(90deg,rgba(255,0,0,0.01),rgba(0,255,0,0.01),rgba(0,0,255,0.01))] bg-[length:100%_2px,3px_100%] pointer-events-none rounded-full overflow-hidden opacity-20" />
-                       </div>
+      ) : (
+        <div className="space-y-24">
+          {evolutionData.length > 0 && (
+            <AnimatedSection direction="up" delay={0.3}>
+              <div className="bg-slate-950 rounded-[3rem] p-10 relative overflow-hidden group/evolution border border-white/5">
+                <div className="absolute top-0 right-0 p-12 opacity-10 group-hover/evolution:scale-110 transition-transform duration-700">
+                  <Activity size={120} className="text-amber-500" />
+                </div>
+                <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                  <div className="lg:col-span-5 space-y-6">
+                    <div className="flex items-center gap-3">
+                      <div className="size-8 rounded-xl bg-amber-500 text-black flex items-center justify-center">
+                        <Zap size={16} fill="currentColor" />
+                      </div>
+                      <span className="text-[10px] font-black text-amber-500 uppercase tracking-[5px]">Predictive Analytics</span>
                     </div>
-                    <div className="space-y-4">
-                       <div className="flex flex-col items-center gap-1">
-                          <span className="text-[10px] font-black uppercase tracking-[5px] text-slate-400">Selection Chance</span>
-                          <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[3px] border ${
-                             (i.success_probability || 0) >= 70 ? "bg-emerald-50 text-emerald-600 border-emerald-100" : (i.success_probability || 0) >= 40 ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-rose-50 text-rose-600 border-rose-100"
-                          }`}>
-                            {i.success_probability}% Probability
-                          </div>
-                       </div>
-                       <div className={`text-[10px] font-black uppercase tracking-[3px] px-5 py-2 rounded-2xl border border-slate-100 bg-white shadow-sm ${
-                         i.match_percentage >= 80 ? "text-amber-600" : i.match_percentage >= 50 ? "text-amber-500" : "text-slate-400"
-                       }`}>
-                         {i.match_percentage >= 80 ? 'Perfect Match' : i.match_percentage >= 50 ? 'High Alignment' : 'Profile Review'}
-                       </div>
-                    </div>
+                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">Skill Evolution<br />Predictor.</h3>
+                    <p className="text-[11px] font-medium text-slate-400 uppercase tracking-[2px] leading-relaxed">
+                      Our AI has analyzed the current market. Acquiring these top missing skills will maximize your matching probability across all active listings.
+                    </p>
                   </div>
-
-                  <div className="flex-1 p-12 flex flex-col justify-between relative">
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-12 mb-12">
-                       <div className="space-y-6">
-                          <div className="flex flex-col gap-2">
-                              <div className="flex items-center gap-4">
-                                <h3 className="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter group-hover:text-amber-600 transition-colors leading-[0.8]">
-                                    {i.title}
-                                </h3>
-                                {i.applied && (
-                                    <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 shadow-sm">
-                                        <ShieldCheck size={14} className="animate-pulse" />
-                                        <span className="text-[10px] font-black uppercase tracking-[3px]">Applied</span>
-                                    </div>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3">
-                                  <div className="size-1.5 rounded-full bg-amber-500/30" />
-                                  <span className="text-[11px] font-bold uppercase tracking-[3px] text-slate-400">{i.company_name}</span>
-                              </div>
-                          </div>
-                          <div className="flex flex-wrap gap-x-10 gap-y-6">
-                             <div className="flex items-center gap-4 group/item">
-                                <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><Globe size={16} /></div>
-                                <div className="flex flex-col">
-                                   <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Location</span>
-                                   <span className="text-[11px] font-black text-slate-500 uppercase tracking-[2px]">{i.location}</span>
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-4 group/item">
-                                <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><Calendar size={16} /></div>
-                                <div className="flex flex-col">
-                                   <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Duration</span>
-                                   <span className="text-[11px] font-black text-slate-500 uppercase tracking-[2px]">{i.duration}</span>
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-4 group/item">
-                                <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><DollarSign size={16} /></div>
-                                <div className="flex flex-col">
-                                   <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Stipend</span>
-                                   <span className="text-[11px] font-black text-amber-600 uppercase tracking-[2px]">{i.stipend}</span>
-                                </div>
-                             </div>
-                          </div>
-                          <div className="flex gap-3">
-                              <button
-                                onClick={() => handleInterviewPrep(i)}
-                                className="px-6 py-3 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-[3px] flex items-center gap-2 hover:bg-indigo-100 transition-all shadow-sm"
-                              >
-                                <Sparkles size={14} />
-                                Interview Prep
-                              </button>
-                           </div>
-                       </div>
-                       <motion.button
-                         whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(217,119,6,0.15)" }} whileTap={{ scale: 0.95 }}
-                         onClick={() => handleApply(i)}
-                         disabled={i.applied || applying === i.id}
-                         className={`px-12 py-6 rounded-2xl text-[11px] font-black uppercase tracking-[5px] shadow-lg transition-all relative overflow-hidden group/btn border border-slate-200 flex items-center gap-5 ${
-                           i.applied ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-amber-600 text-white hover:bg-amber-500 border-amber-500"
-                         }`}
-                       >
-                          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
-                          {applying === i.id ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2 }}><Cpu size={20} /></motion.div> : i.applied ? <ShieldCheck size={20} /> : <Zap size={20} className="fill-white" />}
-                          <span className="relative z-10">{applying === i.id ? 'Processing...' : i.applied ? 'Applied' : 'Apply Now'}</span>
-                       </motion.button>
-                    </div>
-
-                    <div className="relative group/desc mb-12">
-                        <p className="text-[12px] font-medium text-slate-500 uppercase tracking-[2px] leading-relaxed border-l-2 border-amber-500/10 pl-8 max-w-2xl transition-all duration-500">&quot;{i.description}&quot;</p>
-                    </div>
-
-                {/* Action Row */}
-                <div className="mt-8 pt-8 border-t border-slate-100 flex items-center justify-between">
-                       <div className="flex items-center gap-3 pr-8 border-r border-slate-100 shrink-0">
-                          <Terminal size={14} className="text-amber-600/40" />
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[5px]">Required Skills</span>
-                       </div>
-                       <div className="flex flex-wrap gap-3">
-                         {i.required_skills.map((rs) => (
-                           <span key={rs} className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-[4px] border transition-all antialiased ${
-                             mySkills.includes(rs) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-100'
-                           }`}>{mySkills.includes(rs) ? '✓ ' : ''}{rs}</span>
-                         ))}
-                       </div>
-                    </div>
-
-                    {/* Gap Analysis */}
-                    {i.missing_skills.length > 0 && (
-                      <div className="mt-6 p-5 rounded-2xl bg-amber-50/70 border border-amber-100 flex items-start gap-4">
-                        <div className="size-9 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5"><Activity size={15} className="text-amber-600" /></div>
-                        <div className="flex-1">
-                          <div className="text-[10px] font-black text-amber-700 uppercase tracking-[4px] mb-1">Career Gap Analysis</div>
-                          <p className="text-[11px] font-medium text-amber-800/70 mb-3">Add <span className="font-black text-amber-700">{i.missing_skills.length} skill{i.missing_skills.length > 1 ? 's' : ''}</span> to your profile.</p>
-                          <div className="flex flex-wrap gap-2">
-                            {i.missing_skills.map(skill => <span key={skill} className="px-3 py-1 rounded-lg bg-white border border-amber-200 text-[10px] font-black text-amber-700 uppercase tracking-[3px] shadow-sm">+ {skill}</span>)}
-                          </div>
+                  <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {evolutionData.map((skill, idx) => (
+                      <div key={skill.name} className="bg-white/5 border border-white/10 p-6 rounded-[2rem] hover:bg-white/10 transition-all group/item">
+                        <div className="flex justify-between items-start mb-4">
+                          <span className="text-[9px] font-black text-amber-500 uppercase tracking-[2px]">High Impact</span>
+                          <span className="text-[10px] font-black text-white/20">0{idx+1}</span>
+                        </div>
+                        <div className="text-lg font-black text-white uppercase tracking-tighter mb-1">{skill.name}</div>
+                        <div className="text-[9px] font-black text-slate-500 uppercase tracking-[2px] mb-6">+{skill.impact}% Market Reach</div>
+                        <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                          <motion.div initial={{ width: 0 }} whileInView={{ width: `${skill.impact}%` }} transition={{ duration: 1, delay: 0.5 + (idx * 0.1) }} className="h-full bg-amber-500" />
                         </div>
                       </div>
-                    )}
-                 </div>
+                    ))}
+                  </div>
                 </div>
-              </AnimatedSection>
-            );
-        })}
-      </AnimatePresence>
-    </div>
+              </div>
+            </AnimatedSection>
+          )}
 
-      {/* AI Interview Simulation Modal */}
+          <div className="space-y-12">
+            <AnimatePresence mode="popLayout">
+              {filtered.map((i, index) => (
+                <AnimatedSection key={i.id} delay={index * 0.05} direction="up">
+                  <div className="group relative bg-white rounded-[2.5rem] border border-slate-100 hover:border-amber-200 transition-all duration-700 overflow-hidden flex flex-col lg:flex-row shadow-sm hover:shadow-xl">
+                    <div className={`lg:w-72 p-12 flex flex-col items-center justify-center gap-8 text-center transition-all duration-700 relative border-b lg:border-b-0 lg:border-r border-slate-100 ${
+                      (i.match_percentage || 0) >= 80 ? "bg-amber-600/[0.03]" : (i.match_percentage || 0) >= 50 ? "bg-amber-500/[0.03]" : "bg-slate-50"
+                    }`}>
+                      <div className="relative group/score">
+                         <div className="absolute -inset-4 bg-amber-600/5 blur-2xl rounded-full opacity-0 group-hover/score:opacity-100 transition-opacity duration-700" />
+                         <svg className="size-32 transform -rotate-90 relative z-10">
+                           <circle cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="2" fill="transparent" className="text-slate-100" />
+                           <motion.circle
+                             cx="64" cy="64" r="58" stroke="currentColor" strokeWidth="6" fill="transparent"
+                             strokeDasharray={364.4}
+                             initial={{ strokeDashoffset: 364.4 }}
+                             whileInView={{ strokeDashoffset: 364.4 - (364.4 * (i.match_percentage || 0)) / 100 }}
+                             transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+                             className={(i.match_percentage || 0) >= 80 ? "text-amber-600" : (i.match_percentage || 0) >= 50 ? "text-amber-500" : "text-slate-300"}
+                           />
+                         </svg>
+                         <div className="absolute inset-0 flex flex-col items-center justify-center group-hover/score:scale-110 transition-transform duration-500 z-20">
+                           <span className="text-4xl font-black text-slate-900 tracking-tighter">{i.match_percentage}<span className="text-lg opacity-30">%</span></span>
+                           <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-400">Match</span>
+                         </div>
+                      </div>
+                      <div className="space-y-4">
+                         <div className="flex flex-col items-center gap-1">
+                            <span className="text-[10px] font-black uppercase tracking-[5px] text-slate-400">Selection Chance</span>
+                            <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[3px] border ${
+                               (i.success_probability || 0) >= 70 ? "bg-emerald-50 text-emerald-600 border-emerald-100" : (i.success_probability || 0) >= 40 ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-rose-50 text-rose-600 border-rose-100"
+                            }`}>
+                               {i.success_probability || 0}% Probability
+                            </div>
+                         </div>
+                         <div className={`text-[10px] font-black uppercase tracking-[3px] px-5 py-2 rounded-2xl border border-slate-100 bg-white shadow-sm ${
+                           (i.match_percentage || 0) >= 80 ? "text-amber-600" : (i.match_percentage || 0) >= 50 ? "text-amber-500" : "text-slate-400"
+                         }`}>
+                           {(i.match_percentage || 0) >= 80 ? 'Perfect Match' : (i.match_percentage || 0) >= 50 ? 'High Alignment' : 'Profile Review'}
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 p-12 flex flex-col justify-between relative">
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-12 mb-12">
+                         <div className="space-y-6">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-4">
+                                  <h3 className="text-3xl md:text-4xl font-black text-slate-900 uppercase tracking-tighter group-hover:text-amber-600 transition-colors leading-[0.8]">
+                                      {i.title}
+                                  </h3>
+                                  {i.applied && (
+                                      <div className="flex items-center gap-3 px-4 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-700 shadow-sm">
+                                          <ShieldCheck size={14} className="animate-pulse" />
+                                          <span className="text-[10px] font-black uppercase tracking-[3px]">Applied</span>
+                                      </div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="size-1.5 rounded-full bg-amber-500/30" />
+                                    <span className="text-[11px] font-bold uppercase tracking-[3px] text-slate-400">{i.company_name}</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-x-10 gap-y-6">
+                               <div className="flex items-center gap-4 group/item">
+                                  <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><Globe size={16} /></div>
+                                  <div className="flex flex-col">
+                                     <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Location</span>
+                                     <span className="text-[11px] font-black text-slate-500 uppercase tracking-[2px]">{i.location}</span>
+                                  </div>
+                               </div>
+                               <div className="flex items-center gap-4 group/item">
+                                  <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><Calendar size={16} /></div>
+                                  <div className="flex flex-col">
+                                     <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Duration</span>
+                                     <span className="text-[11px] font-black text-slate-500 uppercase tracking-[2px]">{i.duration}</span>
+                                  </div>
+                               </div>
+                               <div className="flex items-center gap-4 group/item">
+                                  <div className="size-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover/item:text-amber-600 shadow-inner group-hover/item:border-amber-200 transition-all duration-500"><DollarSign size={16} /></div>
+                                  <div className="flex flex-col">
+                                     <span className="text-[8px] font-black uppercase tracking-[3px] text-slate-300">Stipend</span>
+                                     <span className="text-[11px] font-black text-amber-600 uppercase tracking-[2px]">{i.stipend}</span>
+                                  </div>
+                               </div>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                  onClick={() => handleInterviewPrep(i)}
+                                  className="px-6 py-3 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-[3px] flex items-center gap-2 hover:bg-indigo-100 transition-all shadow-sm"
+                                >
+                                  <Sparkles size={14} />
+                                  Interview Prep
+                                </button>
+                             </div>
+                         </div>
+                         <motion.button
+                           whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(217,119,6,0.15)" }} whileTap={{ scale: 0.95 }}
+                           onClick={() => handleApply(i)}
+                           disabled={i.applied || applying === i.id}
+                           className={`px-12 py-6 rounded-2xl text-[11px] font-black uppercase tracking-[5px] shadow-lg transition-all relative overflow-hidden group/btn border border-slate-200 flex items-center gap-5 ${
+                             i.applied ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-amber-600 text-white hover:bg-amber-500 border-amber-500"
+                           }`}
+                         >
+                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+                            {applying === i.id ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2 }}><Cpu size={20} /></motion.div> : i.applied ? <ShieldCheck size={20} /> : <Zap size={20} className="fill-white" />}
+                            <span className="relative z-10">{applying === i.id ? 'Processing...' : i.applied ? 'Applied' : 'Apply Now'}</span>
+                         </motion.button>
+                      </div>
+
+                      <div className="relative group/desc mb-12">
+                          <p className="text-[12px] font-medium text-slate-500 uppercase tracking-[2px] leading-relaxed border-l-2 border-amber-500/10 pl-8 max-w-2xl transition-all duration-500">&quot;{i.description}&quot;</p>
+                      </div>
+
+                      <div className="mt-8 pt-8 border-t border-slate-100 flex items-center justify-between">
+                         <div className="flex items-center gap-3 pr-8 border-r border-slate-100 shrink-0">
+                            <Terminal size={14} className="text-amber-600/40" />
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[5px]">Required Skills</span>
+                         </div>
+                         <div className="flex flex-wrap gap-3">
+                           {(i.required_skills || []).map((rs) => (
+                             <span key={rs} className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-[4px] border transition-all antialiased ${
+                               mySkills.includes(rs) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-100'
+                             }`}>{mySkills.includes(rs) ? '✓ ' : ''}{rs}</span>
+                           ))}
+                         </div>
+                      </div>
+
+                      {i.missing_skills && i.missing_skills.length > 0 && (
+                        <div className="mt-6 p-5 rounded-2xl bg-amber-50/70 border border-amber-100 flex items-start gap-4">
+                          <div className="size-9 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0 mt-0.5"><Activity size={15} className="text-amber-600" /></div>
+                          <div className="flex-1">
+                            <div className="text-[10px] font-black text-amber-700 uppercase tracking-[4px] mb-1">Career Gap Analysis</div>
+                            <p className="text-[11px] font-medium text-amber-800/70 mb-3">Add <span className="font-black text-amber-700">{i.missing_skills.length} skill{i.missing_skills.length > 1 ? 's' : ''}</span> to your profile.</p>
+                            <div className="flex flex-wrap gap-2">
+                              {i.missing_skills.map(skill => <span key={skill} className="px-3 py-1 rounded-lg bg-white border border-amber-200 text-[10px] font-black text-amber-700 uppercase tracking-[3px] shadow-sm">+ {skill}</span>)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </AnimatedSection>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
+
+      {/* Interview Prep Modal */}
       <AnimatePresence>
         {aiInterviewModal.open && (
-           <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
-             <motion.div
-               initial={{ opacity: 0, scale: 0.95, y: 20 }}
-               animate={{ opacity: 1, scale: 1, y: 0 }}
-               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-               className="bg-white rounded-[3rem] shadow-2xl p-12 max-w-2xl w-full border border-slate-100 relative overflow-hidden"
-             >
-               <div className="absolute top-0 right-0 p-8 opacity-5">
-                  <Sparkles size={120} className="text-indigo-600" />
-               </div>
-               <div className="relative z-10">
-                 <div className="flex items-center justify-between mb-10">
-                    <div className="flex items-center gap-3 text-indigo-600">
-                       <Sparkles size={20} className="animate-spin-slow" />
-                       <span className="text-[10px] font-black uppercase tracking-[5px]">AI Simulation Active</span>
-                    </div>
-                    <button 
-                      onClick={() => setAiInterviewModal(prev => ({ ...prev, open: false }))}
-                      className="size-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all font-black text-xs"
-                    >
-                      ✕
-                    </button>
-                 </div>
-                 
-                 <h2 className="text-4xl font-black text-slate-950 uppercase tracking-tighter leading-none mb-4">
-                    Predictive Interview<br />
-                    <span className="text-indigo-600">Simulation.</span>
-                 </h2>
-                 <p className="text-[11px] font-black text-slate-400 uppercase tracking-[3px] mb-12">Targeting: {aiInterviewModal.title}</p>
-                 
-                 <div className="space-y-6 mb-12">
-                   {aiInterviewModal.isLoading ? (
-                     <div className="flex flex-col items-center justify-center p-12 gap-6 bg-slate-50 border border-slate-100 rounded-2xl">
-                       <motion.div animate={{ rotate: 360, scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="text-indigo-500">
-                         <Sparkles size={40} className="fill-indigo-500/20" />
-                       </motion.div>
-                       <div className="text-center">
-                         <h3 className="text-xs font-black uppercase tracking-[5px] text-indigo-600 mb-2">Connecting Context to Cohere</h3>
-                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[2px] animate-pulse">Generating personalized technical behavioral challenges...</p>
-                       </div>
-                     </div>
-                   ) : aiInterviewModal.questions.map((q, idx) => (
-                     <div key={idx} className="p-6 rounded-2xl bg-slate-50 border border-slate-100 group hover:border-indigo-200 transition-all">
-                        <div className="flex items-start gap-4">
-                           <span className="text-[10px] font-black text-indigo-600/30 mt-1">0{idx+1}</span>
-                           <p className="text-sm font-bold text-slate-700 leading-relaxed">&quot;{q}&quot;</p>
+           <motion.div 
+             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+             className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-xl"
+           >
+              <motion.div 
+                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+                className="bg-white rounded-[3rem] w-full max-w-2xl overflow-hidden shadow-2xl border border-slate-100"
+              >
+                  <div className="bg-slate-950 p-10 text-white relative">
+                      <div className="absolute top-0 right-0 p-8 opacity-10"><Brain size={120} /></div>
+                      <div className="relative z-10 space-y-4">
+                          <div className="flex items-center gap-3">
+                              <div className="size-2 rounded-full bg-emerald-500 animate-ping" />
+                              <span className="text-[10px] font-black uppercase tracking-[5px] text-emerald-500">AI Interview Simulator</span>
+                          </div>
+                          <h2 className="text-4xl font-black uppercase tracking-tighter leading-none">{aiInterviewModal.title}</h2>
+                          <p className="text-xs font-medium text-slate-400 uppercase tracking-[2px]">Synthesizing technical evaluation vectors based on your neural profile.</p>
+                      </div>
+                      <button 
+                        onClick={() => setAiInterviewModal(prev => ({ ...prev, open: false }))}
+                        className="absolute top-10 right-10 size-12 rounded-2xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all"
+                      >
+                        <X size={20} />
+                      </button>
+                  </div>
+                  
+                  <div className="p-10 space-y-8">
+                      {aiInterviewModal.isLoading ? (
+                        <div className="py-20 flex flex-col items-center justify-center gap-6">
+                           <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 2, ease: "linear" }} className="text-amber-600">
+                              <Cpu size={40} />
+                           </motion.div>
+                           <span className="text-[10px] font-black uppercase tracking-[4px] text-slate-400 animate-pulse">Generating Behavioral Scenarios...</span>
                         </div>
-                     </div>
-                   ))}
-                 </div>
-                 
-                 <button 
-                    onClick={() => setAiInterviewModal(prev => ({ ...prev, open: false }))}
-                    className="w-full h-16 rounded-2xl bg-slate-900 text-white font-black text-[11px] uppercase tracking-[5px] hover:bg-black transition-all shadow-lg"
-                 >
-                   End Simulation
-                 </button>
-               </div>
-             </motion.div>
-           </div>
+                      ) : (
+                        <div className="space-y-6">
+                           {aiInterviewModal.questions.map((q, i) => (
+                             <motion.div 
+                               initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
+                               key={i} className="flex gap-6 group"
+                             >
+                                <span className="text-xl font-black text-amber-600/30 group-hover:text-amber-600 transition-colors">0{i+1}</span>
+                                <p className="text-sm font-bold text-slate-600 leading-relaxed pt-1">{q}</p>
+                             </motion.div>
+                           ))}
+                        </div>
+                      )}
+                      
+                      <button 
+                        onClick={() => setAiInterviewModal(prev => ({ ...prev, open: false }))}
+                        className="w-full py-6 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-[4px] hover:bg-emerald-600 transition-all shadow-xl"
+                      >
+                        Acknowledge Protocol
+                      </button>
+                  </div>
+              </motion.div>
+           </motion.div>
         )}
       </AnimatePresence>
     </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin as supabase } from '@/lib/supabase';
 import { AI_ENGINE } from '@/lib/ai-engine';
 import { Student as IStudent, Internship as IInternship, Application as IApplication } from '@/types';
 
@@ -41,11 +41,12 @@ export async function GET(request: Request) {
       .select(`
         *,
         company(company_name),
-        internship_requirements(skill(skill_name))
+        internship_skill(skill(skill_name))
       `);
 
     const allInternships: IInternship[] = (allInternshipsRaw || []).map((i: any) => ({
       id: i.internship_id.toString(),
+      internship_id: i.internship_id,
       company_id: i.company_id,
       company_name: i.company?.company_name || 'Independent',
       title: i.title,
@@ -55,9 +56,10 @@ export async function GET(request: Request) {
       location: i.location,
       status: 'Open',
       requirements: {
-        role_skills: i.internship_requirements?.map((ir: any) => ir.skill.skill_name) || [],
+        role_skills: i.internship_skill?.map((ir: any) => ir.skill.skill_name) || [],
         experience_level: 'Entry'
-      }
+      },
+      required_skills: i.internship_skill?.map((ir: any) => ir.skill.skill_name) || []
     }));
 
     // 4. Fetch Applications for this student
@@ -72,23 +74,29 @@ export async function GET(request: Request) {
     const allApplications = (allApplicationsRaw || []).map((a: any) => ({
       application_id: a.application_id.toString(),
       student_id: a.student_id,
-      internship_id: a.internship_id.toString(),
+      internship_id: a.internship_id?.toString(),
       status: a.status,
       applied_date: a.applied_date,
+      ai_match_score: a.ai_match_score || 0, // SkillSync Match Score
       role_title: a.internship?.title,
       company_name: a.internship?.company?.company_name
     }));
 
     // AI Features: Skill Evolution Predictor
-    const skillList = studentSkills.map(s => s.skill_name);
+    const skillList = studentSkills.map((s: any) => s.skill_name);
     const marketReach = AI_ENGINE.calculateMarketReach(skillList, allInternships);
     const highImpactSkill = AI_ENGINE.getHighImpactSkill(skillList, allInternships);
 
     // Update student's market reach in DB (Proactive Intelligence)
-    await supabase
-      .from('student')
-      .update({ market_reach: marketReach } as any)
-      .eq('student_id', userId);
+    // Wrap in try-catch to allow stats to load even if final migration isn't applied yet
+    try {
+      await supabase
+        .from('student')
+        .update({ market_reach: marketReach } as any)
+        .eq('student_id', userId);
+    } catch (e) {
+      console.warn("Market reach persistence delay - column might be missing.");
+    }
 
     return NextResponse.json({
       success: true,
@@ -96,16 +104,18 @@ export async function GET(request: Request) {
         id: studentData.student_id,
         name: studentData.name,
         email: studentData.email,
+        roll_no: studentData.roll_no,
         college: studentData.college,
         skills: studentSkills,
         market_reach: marketReach,
-        high_impact_skill: highImpactSkill
+        high_impact_skill: highImpactSkill,
+        ai_resume_analysis: studentData.ai_resume_analysis
       },
       stats: {
         applications: allApplications.length,
         skills: studentSkills.length,
         internships: allInternships.length,
-        accepted: allApplications.filter(a => a.status === 'Accepted').length
+        accepted: allApplications.filter((a: any) => a.status === 'Accepted').length
       },
       recentApplications: allApplications.slice(0, 4)
     });

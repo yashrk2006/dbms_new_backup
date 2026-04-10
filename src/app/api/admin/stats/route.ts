@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 import { AI_ENGINE } from '@/lib/ai-engine';
 
 export async function GET() {
@@ -7,14 +7,16 @@ export async function GET() {
     // 1. Fetch Basic Counts
     const [
       { count: studentCount },
+      { count: directoryCount },
       { count: internshipCount },
       { count: applicationCount },
       { count: companyCount }
     ] = await Promise.all([
-      supabase.from('student').select('*', { count: 'exact', head: true }),
-      supabase.from('internship').select('*', { count: 'exact', head: true }),
-      supabase.from('application').select('*', { count: 'exact', head: true }),
-      supabase.from('company').select('*', { count: 'exact', head: true })
+      supabaseAdmin.from('student').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('college_directory').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('internship').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('application').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('company').select('*', { count: 'exact', head: true })
     ]);
 
     // 2. Fetch Data for AI Intelligence
@@ -24,17 +26,17 @@ export async function GET() {
       { data: applicationsRaw },
       { data: allSkills }
     ] = await Promise.all([
-      supabase.from('student').select('student_id, name, student_skill(skill(skill_name))'),
-      supabase.from('internship').select('internship_id, title, internship_requirements(skill(skill_name))'),
-      supabase.from('application').select('*').limit(20).order('applied_date', { ascending: false }),
-      supabase.from('skill').select('skill_name')
+      supabaseAdmin.from('student').select('student_id, name, student_skill(skill(skill_name))'),
+      supabaseAdmin.from('internship').select('internship_id, title, internship_skill(skill(skill_name))'),
+      supabaseAdmin.from('application').select('*').limit(20).order('applied_date', { ascending: false }),
+      supabaseAdmin.from('skill').select('skill_name')
     ]);
 
     const internships = (internshipsRaw || []).map((i: any) => ({
         id: i.internship_id.toString(),
         title: i.title,
         requirements: {
-            role_skills: i.internship_requirements?.map((ir: any) => ir.skill.skill_name) || []
+            role_skills: i.internship_skill?.map((ir: any) => ir.skill.skill_name) || []
         }
     }));
 
@@ -61,7 +63,7 @@ export async function GET() {
             marketReach
         };
     })
-    .filter(s => s.reason !== '')
+    .filter((s: any) => s.reason !== '')
     .sort((a, b) => a.marketReach - b.marketReach)
     .slice(0, 4);
 
@@ -69,7 +71,7 @@ export async function GET() {
     const marketEquilibrium = AI_ENGINE.getMarketEquilibrium(students as any, internships as any);
 
     // 4. Recent Intelligence Feed (Latest 10 Applications)
-    const { data: recentAppsRaw } = await supabase
+    const { data: recentAppsRaw } = await supabaseAdmin
       .from('application')
       .select(`
         application_id,
@@ -93,7 +95,7 @@ export async function GET() {
       success: true,
       data: {
         stats: {
-            students: studentCount || 0,
+            students: (studentCount || 0) + (directoryCount || 0),
             companies: companyCount || 0,
             internships: internshipCount || 0,
             applications: applicationCount || 0

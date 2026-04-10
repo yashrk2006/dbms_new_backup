@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { AI_ENGINE } from '@/lib/ai-engine';
-import { NotificationService } from '@/lib/notifications';
+import { notifyStatusUpdate } from '@/lib/notifications';
 
 export async function GET(request: Request) {
   try {
@@ -15,10 +15,10 @@ export async function GET(request: Request) {
     // 1. Fetch Company Internships (to filter applications)
     const { data: internships } = await supabase
       .from('internship')
-      .select('internship_id, title, internship_requirements(skill(skill_name))')
+      .select('internship_id, title, internship_skill(skill(skill_name))')
       .eq('company_id', companyId);
 
-    const internIds = (internships || []).map(i => i.internship_id);
+    const internIds = (internships || []).map((i: any) => i.internship_id);
 
     // 2. Fetch Applications for those internships
     const { data: applications, error } = await supabase
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       .select(`
         *,
         student(
-          student_id, name, email, college, branch, graduation_year,
+          student_id, name, email, college, branch, graduation_year, roll_no,
           student_skill(skill(skill_name))
         ),
         internship(internship_id, title)
@@ -39,8 +39,8 @@ export async function GET(request: Request) {
     // 3. Enrich with AI matching logic
     const enriched = (applications || []).map((app: any) => {
       const studentSkills = app.student?.student_skill?.map((sk: any) => sk.skill.skill_name) || [];
-      const role = internships?.find(i => i.internship_id === app.internship_id);
-      const requiredSkills = role?.internship_requirements?.map((ir: any) => ir.skill.skill_name) || [];
+      const role = internships?.find((i: any) => i.internship_id === app.internship_id);
+      const requiredSkills = role?.internship_skill?.map((ir: any) => ir.skill.skill_name) || [];
 
       const matchScore = AI_ENGINE.calculateMatchScore(studentSkills, requiredSkills);
       const aiInterviewQuestions = (app.student && role) ? AI_ENGINE.generateInterviewQuestions(studentSkills, role.title) : [];
@@ -55,6 +55,7 @@ export async function GET(request: Request) {
           email: app.student.email,
           college: app.student.college,
           branch: app.student.branch,
+          roll_no: app.student.roll_no,
           graduation_year: app.student.graduation_year || '2025',
           skills: app.student.student_skill?.map((sk: any) => ({
             skill_name: sk.skill.skill_name
@@ -76,9 +77,10 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const { applicationId, status } = await request.json();
+    const { application_id, applicationId, status } = await request.json();
+    const id = application_id || applicationId;
 
-    if (!applicationId || !status) {
+    if (!id || !status) {
       return NextResponse.json({ success: false, error: 'Missing fields' }, { status: 400 });
     }
 
@@ -87,10 +89,10 @@ export async function PATCH(request: Request) {
       .from('application')
       .select(`
         *,
-        student(name, email),
+        student(student_id, name, email),
         internship(title)
       `)
-      .eq('application_id', applicationId)
+      .eq('application_id', id)
       .single();
 
     if (fetchError || !application) {
@@ -101,7 +103,7 @@ export async function PATCH(request: Request) {
     const { data: updated, error } = await supabase
       .from('application')
       .update({ status } as any)
-      .eq('application_id', applicationId)
+      .eq('application_id', id)
       .select()
       .single();
 
@@ -115,8 +117,9 @@ export async function PATCH(request: Request) {
       const student = (application as any).student;
       const internship = (application as any).internship;
 
-      if (student?.email) {
-          await NotificationService.notifyStatusUpdate(
+      if (student?.email && student?.student_id) {
+          await notifyStatusUpdate(
+            student.student_id,
             student.email,
             student.name,
             internship.title,

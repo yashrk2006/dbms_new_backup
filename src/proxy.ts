@@ -1,7 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+// Next.js 16: renamed from 'middleware' to 'proxy'
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -54,17 +55,24 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser()
+    user = data.user
+  } catch (error) {
+    // Stale Refresh Token or Network Issue — silently pass through, page-level auth guards will catch
+    console.error('Auth proxy: session refresh failed — user will be redirected by page guard.');
+  }
 
   // Protected Routes Logic
   const pathname = request.nextUrl.pathname
 
-  // 1. Auth redirection (Signed in users shouldn't see login/signup)
-  if (user && (pathname.startsWith('/auth/login') || pathname.startsWith('/auth/signup'))) {
+  // 1. Redirect signed-in users away from login
+  if (user && pathname.startsWith('/auth/login')) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // 2. Protected Dashboard Routes
+  // 2. Protect all dashboard / admin / company routes
   const isDashboardRoute = pathname.startsWith('/dashboard')
   const isAdminRoute = pathname.startsWith('/admin')
   const isCompanyRoute = pathname.startsWith('/company')
@@ -73,9 +81,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 
-  // 3. Role-Based Access Control (RBAC) 
-  // Note: We'll rely on the app pages to do a deep check, 
-  // but middleware can do a quick check if role is in user_metadata
+  // 3. Role-Based Access Control (RBAC)
   if (user) {
     const role = user.app_metadata?.role || user.user_metadata?.role
 
@@ -97,7 +103,6 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

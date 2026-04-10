@@ -1,28 +1,18 @@
 import type { Metadata } from "next";
-import { Inter, Public_Sans, DM_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
+import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ToasterProvider } from "@/components/providers/ToasterProvider";
-import "./globals.css";
 
-const inter = Inter({
+const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  variable: "--font-display",
-});
-
-const publicSans = Public_Sans({
-  subsets: ["latin"],
-  variable: "--font-body",
-});
-
-const dmMono = DM_Mono({
-  weight: "400",
-  subsets: ["latin"],
-  variable: "--font-mono",
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-plus-jakarta",
 });
 
 export const metadata: Metadata = {
-  title: "SkillSync | Professional Talent Platform",
-  description: "Advanced career development and professional internship matching platform.",
+  title: "SkillSync - Intelligent Recruitment Ecosystem",
+  description: "AI-driven professional development and hiring platform.",
 };
 
 export default function RootLayout({
@@ -31,22 +21,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${publicSans.variable} ${dmMono.variable}`}>
-      <body suppressHydrationWarning className="min-h-screen bg-background text-foreground font-body antialiased relative overflow-x-hidden">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          {/* Premium Background Architecture */}
-          <div className="fixed inset-0 pointer-events-none z-[-1]" suppressHydrationWarning>
-             <div className="absolute inset-0 bg-mesh-gradient opacity-100" suppressHydrationWarning />
-             <div className="absolute inset-0 bg-grid-pattern opacity-100" suppressHydrationWarning />
-          </div>
-
-          {/* Global Frame Overlay */}
-          <div className="fixed inset-0 pointer-events-none border border-border/5 z-20" suppressHydrationWarning />
-
-          <div className="relative z-10" suppressHydrationWarning>
-            <ToasterProvider />
-            {children}
-          </div>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <link 
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-25..0&display=swap" 
+          rel="stylesheet" 
+        />
+      </head>
+      <body className={`${plusJakarta.className} antialiased min-h-screen bg-background text-foreground transition-colors duration-300`} suppressHydrationWarning>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ToasterProvider />
+          {children}
         </ThemeProvider>
       </body>
     </html>

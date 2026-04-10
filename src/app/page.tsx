@@ -174,8 +174,9 @@ export default function LandingPage() {
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
                 <Link
-                  href="/auth/signup"
+                  href="/auth/login"
                   className="w-full sm:w-auto px-20 py-8 rounded-[2.5rem] bg-slate-950 text-white text-[11px] font-black uppercase tracking-[0.6em] shadow-[0_45px_90px_-20px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all flex items-center justify-center gap-6 group"
+                  suppressHydrationWarning
                 >
                   Join the Network
                   <Zap size={22} className="fill-amber-500 text-amber-500 group-hover:rotate-45 transition-transform duration-500" />
@@ -504,8 +505,9 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
                <Link
-                 href="/auth/signup"
+                 href="/auth/login"
                  className="px-20 py-8 rounded-[2.5rem] bg-slate-950 text-white text-xs font-black uppercase tracking-[0.6em] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] hover:scale-110 active:scale-95 transition-all inline-flex items-center gap-6 group"
+                 suppressHydrationWarning
                >
                  Initialize Sync
                  <Zap size={24} className="fill-amber-500 text-amber-500 group-hover:rotate-45 transition-transform" />
