@@ -12,15 +12,42 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Company ID required' }, { status: 400 });
     }
 
-    // 1. Fetch Company Data (Using supabaseAdmin to bypass RLS)
-    const { data: company, error: companyError } = await supabase
+    // 1. Fetch Company Data — auto-provision if not found (first login flow)
+    let { data: company, error: companyError } = await supabase
       .from('company')
       .select('*')
       .eq('company_id', companyId)
       .single();
 
-    if (companyError || !company) {
-      return NextResponse.json({ success: false, error: 'Company not found' }, { status: 404 });
+    if (!company || companyError) {
+      // Company user logged in but has no company record — auto-create it
+      console.log(`🏢 Auto-provisioning company record for auth user: ${companyId}`);
+      
+      // Grab their email from the auth system
+      const { data: { user: authUser } } = await supabase.auth.admin.getUserById(companyId);
+      const email = authUser?.email || `company_${companyId.slice(0, 8)}@platform.com`;
+      const displayName = authUser?.user_metadata?.company_name 
+        || authUser?.user_metadata?.full_name 
+        || email.split('@')[0];
+
+      const { data: newCompany, error: createError } = await supabase
+        .from('company')
+        .upsert({
+          company_id: companyId,
+          email,
+          company_name: displayName,
+          is_verified: true,         // auto-verify on first login
+          industry: 'Technology',
+          location: 'India'
+        } as any, { onConflict: 'company_id' })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('❌ Company auto-provision failed:', createError.message);
+        return NextResponse.json({ success: false, error: 'Company provisioning failed. Please contact support.' }, { status: 500 });
+      }
+      company = newCompany;
     }
 
     // 2. Fetch Company Internships with Requirements

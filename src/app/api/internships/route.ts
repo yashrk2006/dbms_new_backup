@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,20 +9,21 @@ export async function GET(request: Request) {
     const userId = searchParams.get('userId');
 
     // 1. Fetch Internships with Company and Requirements
-    const { data: internships, error } = await supabase
+    const { data: internships, error } = await supabaseAdmin
       .from('internship')
       .select(`
         *,
         company(company_name),
         internship_skill(skill(skill_name))
-      `);
+      `)
+      .order('internship_id', { ascending: false });
 
     if (error) throw error;
 
     // 2. Fetch User's Applications (to mark as applied)
     let appliedIds: Set<number> = new Set();
     if (userId) {
-      const { data: userApps } = await supabase
+      const { data: userApps } = await supabaseAdmin
         .from('application')
         .select('internship_id')
         .eq('student_id', userId);
