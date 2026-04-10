@@ -79,8 +79,7 @@ export async function GET(request: Request) {
           branch: student?.branch,
           graduation_year: student?.graduation_year,
           resume_url: student?.resume_url,
-          email: student?.email,
-          bio: student?.bio
+          email: student?.email
         },
         stats: {
           skills: skillsCountRes.count || 0,
