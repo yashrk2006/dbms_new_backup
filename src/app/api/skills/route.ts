@@ -13,13 +13,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'User Context Missing' }, { status: 400 });
     }
 
-    // 1. Fetch Student Skills & Profile Data
+    // 1. Fetch Student Skills & Profile Data (use admin client to bypass any RLS)
     const [
       { data: studentData, error: studentError },
       { data: skilledData, error: skillsError }
     ] = await Promise.all([
-      supabase.from('student').select('ai_resume_analysis').eq('student_id', userId).single(),
-      supabase
+      supabaseAdmin.from('student').select('ai_resume_analysis').eq('student_id', userId).single(),
+      supabaseAdmin
         .from('student_skill')
         .select('proficiency_level, skill(skill_id, skill_name, category)')
         .eq('student_id', userId)
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
     }
 
     // Return the updated skill list
-    const { data: updatedSkillsRaw } = await supabase
+    const { data: updatedSkillsRaw } = await supabaseAdmin
       .from('student_skill')
       .select('proficiency_level, skill(skill_id, skill_name, category)')
       .eq('student_id', userId);

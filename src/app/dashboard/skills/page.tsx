@@ -72,27 +72,33 @@ export default function SkillsPage() {
   useEffect(() => { load(); }, [load]);
 
   const addSkill = async () => {
-    if (!selectedSkillName) return;
+    // Use either the selected skill from dropdown OR whatever is typed in the search box
+    const skillToAdd = selectedSkillName || searchQuery.trim();
+    if (!skillToAdd) { toast.error('Please type or select a skill first.'); return; }
     setAdding(true);
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user?.id;
-    if (!userId) return;
+    if (!userId) { setAdding(false); return; }
 
     try {
       const resp = await fetch('/api/skills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, skillName: selectedSkillName, proficiencyLevel: selectedLevel })
+        body: JSON.stringify({ userId, skillName: skillToAdd, proficiencyLevel: selectedLevel })
       });
       const result = await resp.json();
       if (result.success) {
         setMySkills(result.data);
         setSelectedSkillName('');
         setSearchQuery('');
-        setAiSkillSuggestions(prev => prev.filter(s => s !== selectedSkillName));
+        setAiSkillSuggestions(prev => prev.filter(s => s !== skillToAdd));
+        toast.success(`${skillToAdd} added to your matrix!`);
+      } else {
+        toast.error(result.error || 'Failed to add skill.');
       }
     } catch (err) {
       console.error(err);
+      toast.error('Network error. Please try again.');
     } finally {
       setAdding(false);
     }
@@ -153,11 +159,15 @@ export default function SkillsPage() {
                                 <div className="absolute inset-y-0 left-5 flex items-center text-slate-400 group-focus-within:text-amber-600 transition-colors">
                                     <Search size={16} />
                                 </div>
-                                <input 
+                                 <input 
                                     type="text" 
-                                    placeholder="SEARCH 40+ SKILLS..."
+                                    placeholder="TYPE OR SEARCH 40+ SKILLS..."
                                     value={searchQuery || selectedSkillName}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    onChange={(e) => {
+                                      setSearchQuery(e.target.value);
+                                      setSelectedSkillName(''); // clear previous selection when typing new
+                                    }}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') addSkill(); }}
                                     className="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-[11px] font-black uppercase tracking-widest focus:bg-white focus:ring-4 focus:ring-slate-900/5 focus:border-slate-300 transition-all outline-none placeholder:text-slate-300"
                                 />
                                 <AnimatePresence>
@@ -211,7 +221,7 @@ export default function SkillsPage() {
 
                         <button 
                             onClick={addSkill}
-                            disabled={adding || !selectedSkillName}
+                            disabled={adding || (!selectedSkillName && !searchQuery.trim())}
                             className="w-full py-5 bg-slate-900 text-white rounded-[1.5rem] font-black uppercase tracking-[3px] text-[10px] hover:bg-amber-600 shadow-xl shadow-slate-900/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-3"
                         >
                             {adding ? <Activity size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
