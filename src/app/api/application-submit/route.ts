@@ -80,7 +80,7 @@ export async function POST(request: Request) {
     const [studentRes, internshipRes, studentDataRes] = await Promise.all([
       supabase.from('student_skill').select('skill(skill_name)').eq('student_id', student_id),
       supabase.from('internship_skill').select('skill(skill_name)').eq('internship_id', internship_id),
-      supabase.from('student').select('name, email, bio').eq('student_id', student_id).single(),
+      supabase.from('student').select('name, email').eq('student_id', student_id).single(),
     ]);
 
     const { data: internshipData } = await supabase
@@ -93,12 +93,12 @@ export async function POST(request: Request) {
       .eq('internship_id', internship_id)
       .single();
 
-    if (studentRes.error || internshipRes.error || !internshipData || studentDataRes.error) {
-      console.error('❌ Context Retrieval Failure for AI Engine');
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Failed to synchronize institutional matching context. Please ensure your profile is complete.' 
-      }, { status: 404 });
+    // Log any context errors but do NOT block the application — AI match can degrade gracefully
+    if (studentRes.error) console.warn('⚠️ Student skills unavailable for AI match:', studentRes.error.message);
+    if (internshipRes.error) console.warn('⚠️ Internship skills unavailable for AI match:', internshipRes.error.message);
+    if (studentDataRes.error) console.warn('⚠️ Student profile partial:', studentDataRes.error.message);
+    if (!internshipData) {
+      return NextResponse.json({ success: false, error: 'The specified internship opportunity could not be located.' }, { status: 404 });
     }
 
     const studentSkills = (studentRes.data || []).map((s: any) => s.skill.skill_name);
@@ -161,9 +161,10 @@ export async function POST(request: Request) {
 
     // POST-SUBMISSION: Candidate Pitch Generation for Auto-Fill Agent
     let aiPitch = "";
-    if (process.env.COHERE_API_KEY) {
+    if (process.env.COHERE_API_KEY && studentDataRes.data) {
       try {
-        const pitchPrompt = `Generate a 2-sentence professional pitch for ${studentDataRes.data.name} applying for ${internshipData.title}. 
+        const studentName = studentDataRes.data?.name || 'Student';
+        const pitchPrompt = `Generate a 2-sentence professional pitch for ${studentName} applying for ${internshipData.title}. 
         Skills: ${studentSkills.join(', ')}. Mention why they are a top match.`;
         
         const pitchRes = await fetch('https://api.cohere.com/v1/chat', {
@@ -176,15 +177,16 @@ export async function POST(request: Request) {
       } catch (e) { console.error("Pitch generation delay...", e); }
     }
 
-    // 4. Syndicate Notifications
+    // 4. Syndicate Notifications (fully guarded — non-fatal if student profile is incomplete)
     try {
       const student = studentDataRes.data;
       const company = (internshipData as any).company;
-
-      await Promise.all([
-        notifyApplicationReceived(student_id, student.email, student.name, internshipData.title),
-        notifyCompanyNewApplicant(company.email, student.name, internshipData.title)
-      ]);
+      if (student && company) {
+        await Promise.all([
+          notifyApplicationReceived(student_id, student.email, student.name, internshipData.title),
+          notifyCompanyNewApplicant(company.email, student.name, internshipData.title)
+        ]);
+      }
     } catch (notifyError) {
       console.warn('⚡ Notification portal async delay...');
     }
